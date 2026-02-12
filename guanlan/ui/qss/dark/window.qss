@@ -1,0 +1,22 @@
+/* 观澜量化 - 独立窗口样式（深色主题）
+ * FluentWindow 等独立弹出窗口专用样式
+ */
+
+/* ===== 独立窗口（QDialog）需要实心背景 ===== */
+QDialog {
+    background-color: rgb(32, 32, 32);
+}
+
+/* ===== 独立窗口内容区域（与 FluentWindow StackedWidget 一致） ===== */
+#dialogContent {
+    background-color: rgba(255, 255, 255, 0.0314);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0px;
+}
+
+/* ===== 对话框内容面板 ===== */
+#contentPanel {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    padding: 16px;
+}

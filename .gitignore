@@ -1,0 +1,35 @@
+# Python 虚拟环境
+venv/
+.venv/
+env/
+ENV/
+
+# Python 编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 运行时配置目录
+.guanlan/
+
+# 数据文件
+*.db
+*.sqlite
+*.log
+
+# 配置文件
+.env
+*.ini
+
+# 系统文件
+.DS_Store
+Thumbs.db

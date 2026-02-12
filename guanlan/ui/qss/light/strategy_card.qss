@@ -1,0 +1,34 @@
+/* 观澜量化 - 策略卡片样式（浅色主题）
+ * CTA / 组合策略 / 脚本策略 卡片头部通用样式
+ */
+
+/* ===== 卡片标题 ===== */
+#cardTitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a202c;
+}
+
+/* ===== 分隔点 ===== */
+#cardDot {
+    color: #718096;
+    font-size: 16px;
+}
+
+/* ===== 信息标签（合约、账户等） ===== */
+#cardInfo {
+    color: #718096;
+    font-size: 16px;
+}
+
+/* ===== 次要信息标签（脚本路径等） ===== */
+#cardInfoSub {
+    color: #718096;
+    font-size: 14px;
+}
+
+/* ===== 卡片头部渐变装饰线 ===== */
+#cardHeader {
+    border-bottom: 2px solid transparent;
+    border-image: linear-gradient(90deg, #4A90D9 0%, #5BA0E0 50%, transparent 100%) 1;
+}

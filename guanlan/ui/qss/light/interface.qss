@@ -1,0 +1,122 @@
+/* 观澜量化 - 界面样式（浅色主题）
+ * 嵌入主窗口的界面专用样式
+ * 包含：ScrollArea、Banner、页面标题、卡片组件
+ */
+
+/* ===== ScrollArea ===== */
+QScrollArea, ScrollArea {
+    background-color: transparent;
+    border: none;
+}
+
+QScrollArea > QWidget > QWidget,
+ScrollArea > QWidget > QWidget {
+    background-color: transparent;
+}
+
+/* ===== Banner 标题 ===== */
+#bannerLabel {
+    font: 42px 'Segoe UI Light', 'Microsoft YaHei Light', 'PingFang SC';
+    font-weight: 300;
+    color: #1a202c;
+    background-color: transparent;
+    padding-left: 28px;
+    padding-top: 8px;
+}
+
+/* ===== 设置页标题 ===== */
+#settingLabel {
+    font: 33px 'Segoe UI Semibold', 'Microsoft YaHei', 'PingFang SC';
+    font-weight: 600;
+    color: #1a202c;
+    background-color: transparent;
+}
+
+/* ===== 通用页面标题 ===== */
+#pageTitle {
+    font: 28px 'Segoe UI Semibold', 'Microsoft YaHei', 'PingFang SC';
+    font-weight: 600;
+    color: #1a202c;
+    background-color: transparent;
+}
+
+/* ===== 模块分组标题 ===== */
+#viewTitleLabel {
+    font: 20px 'Segoe UI Semibold', 'Microsoft YaHei', 'PingFang SC';
+    font-weight: 600;
+    color: #4a5568;
+    letter-spacing: 1px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid transparent;
+    border-image: linear-gradient(90deg, #7B68EE 0%, #4A90D9 50%, transparent 100%) 1;
+}
+
+/* ===== CardWidget 通用样式 ===== */
+CardWidget {
+    background-color: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(123, 104, 238, 0.1);
+    border-radius: 12px;
+}
+
+CardWidget:hover {
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(123, 104, 238, 0.25);
+}
+
+/* ===== ModuleCard 功能卡片 ===== */
+ModuleCard {
+    background-color: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 10px;
+}
+
+ModuleCard:hover {
+    background-color: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 10px;
+}
+
+ModuleCard > StrongBodyLabel {
+    font-weight: bold;
+    color: #2d3748;
+}
+
+ModuleCard > BodyLabel {
+    font-size: 11px;
+    color: rgba(74, 85, 104, 0.7);
+}
+
+/* ===== FeatureCard 样式 ===== */
+FeatureCard {
+    background-color: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(123, 104, 238, 0.1);
+    border-radius: 12px;
+}
+
+FeatureCard:hover {
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(123, 104, 238, 0.25);
+}
+
+/* ===== 徽章计数 ===== */
+#badgeCount {
+    background: #E74C3C;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 10px;
+}
+
+/* ===== 录制指示灯 ===== */
+#recordingDot {
+    color: red;
+    font-size: 16px;
+}
+
+/* ===== 首页监控面板 ===== */
+#tradingPanel, #accountPanel, #aiChatPanel,
+#logPanel, #orderPanel {
+    background-color: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 8px;
+}

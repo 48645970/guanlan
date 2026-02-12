@@ -1,0 +1,110 @@
+/* 观澜量化 - 辅助交易窗口样式（浅色主题） */
+
+/* ===== 工具栏卡片 ===== */
+#toolbarCard {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+}
+
+/* ===== 信号卡片 ===== */
+#signalCard {
+    border: 1px solid rgba(128, 128, 128, 0.15);
+    border-radius: 8px;
+}
+
+/* ===== 方向指示标签 ===== */
+#directionLabel {
+    color: rgba(128, 128, 128, 0.8);
+    font-size: 22px;
+    font-weight: bold;
+}
+
+/* ===== 建议信息 ===== */
+#suggestLabel {
+    color: rgba(0, 0, 0, 0.5);
+    font-size: 16px;
+}
+
+/* ===== 提示文字 ===== */
+#tipLabel {
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 16px;
+}
+
+/* ===== 底部卡片 ===== */
+#bottomCard {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+}
+
+/* ===== 买多按钮（红色） ===== */
+#buyButton {
+    background-color: rgba(192, 64, 64, 0.85);
+    border: 1px solid rgba(192, 64, 64, 0.4);
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+#buyButton:hover {
+    background-color: rgba(220, 80, 80, 0.95);
+}
+
+#buyButton:pressed {
+    background-color: rgba(160, 48, 48, 0.95);
+}
+
+#buyButton:disabled {
+    background-color: rgba(128, 128, 128, 0.15);
+    border: 1px solid rgba(128, 128, 128, 0.12);
+    color: rgba(0, 0, 0, 0.25);
+}
+
+/* ===== 卖空按钮（绿色） ===== */
+#sellButton {
+    background-color: rgba(64, 160, 64, 0.85);
+    border: 1px solid rgba(64, 160, 64, 0.4);
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+#sellButton:hover {
+    background-color: rgba(80, 180, 80, 0.95);
+}
+
+#sellButton:pressed {
+    background-color: rgba(48, 128, 48, 0.95);
+}
+
+#sellButton:disabled {
+    background-color: rgba(128, 128, 128, 0.15);
+    border: 1px solid rgba(128, 128, 128, 0.12);
+    color: rgba(0, 0, 0, 0.25);
+}
+
+/* ===== 平仓按钮（紫蓝） ===== */
+#closeButton {
+    background-color: rgba(123, 104, 238, 0.8);
+    border: 1px solid rgba(123, 104, 238, 0.3);
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+#closeButton:hover {
+    background-color: rgba(139, 124, 240, 0.9);
+}
+
+#closeButton:pressed {
+    background-color: rgba(106, 90, 205, 0.9);
+}
+
+#closeButton:disabled {
+    background-color: rgba(128, 128, 128, 0.15);
+    border: 1px solid rgba(128, 128, 128, 0.12);
+    color: rgba(0, 0, 0, 0.25);
+}

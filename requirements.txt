@@ -1,0 +1,52 @@
+# VNPY 核心包
+vnpy>=4.3.0
+
+# VNPY 官方应用模块
+vnpy-ctastrategy>=1.3.3
+vnpy-ctabacktester>=1.1.0
+vnpy-datamanager>=1.0.9
+vnpy-datarecorder>=1.0.5
+vnpy-riskmanager>=1.0.5
+vnpy-portfoliomanager>=1.0.3
+vnpy-portfoliostrategy>=1.1.4
+vnpy-scripttrader>=1.0.5
+vnpy-chartwizard>=1.0.4
+vnpy-rpcservice>=1.0.4
+
+# VNPY 交易接口
+vnpy-ctp>=6.7.11.2
+
+# 数据存储
+arcticdb>=5.0.0
+
+# 图形界面
+PySide6>=6.5.0
+PySide6-Fluent-Widgets>=1.11.0
+
+# 技术分析
+TA-Lib>=0.4.24
+numpy>=2.0.0
+pandas>=2.0.0
+
+# 数据处理
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# 消息通知
+DingtalkChatbot>=1.5.3
+
+# 交易日历
+pandas-market-calendars>=5.3.0
+
+# 数据模型
+pydantic>=2.0.0
+
+# AI 服务
+openai>=1.0.0
+markdown>=3.5.0
+
+# 工具库
+python-dotenv>=1.0.0
+pytz>=2023.3
+tzlocal>=5.0.0

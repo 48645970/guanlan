@@ -1,0 +1,48 @@
+/* 观澜量化 - Banner 链接卡片样式 (浅色主题)
+ * 设计理念：清新玻璃感 + 紫蓝渐变边框
+ */
+
+/* ===== 卡片基础样式 ===== */
+LinkCard, ModuleCard {
+    border-radius: 10px;
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* ===== 卡片悬停状态 ===== */
+LinkCard:hover, ModuleCard:hover {
+    border-radius: 10px;
+    background-color: rgba(255, 255, 255, 1.0);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* ===== 卡片标题 ===== */
+LinkCard > #titleLabel, ModuleCard > #titleLabel {
+    font: 18px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC';
+    font-weight: bold;
+    color: #1a202c;
+}
+
+/* ===== 卡片描述文字 ===== */
+LinkCard > #contentLabel, ModuleCard > #contentLabel {
+    font: 11px 'Segoe UI', 'Microsoft YaHei', 'PingFang SC';
+    color: rgba(74, 85, 104, 0.7);
+}
+
+/* ===== 卡片容器 ===== */
+LinkCardView {
+    background-color: transparent;
+    border: none;
+}
+
+#view {
+    background-color: transparent;
+}
+
+/* ===== 图标容器增强 ===== */
+LinkCard > IconWidget, ModuleCard > IconWidget {
+    /* 图标区域背景 */
+    background-color: rgba(123, 104, 238, 0.08);
+    border-radius: 12px;
+    padding: 8px;
+}

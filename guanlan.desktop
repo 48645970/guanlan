@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=观澜量化
+Comment=量化交易平台
+Exec=python3 ${PROJECT_PATH}/main.py
+Icon=${PROJECT_PATH}/resources/images/logo.png
+Path=${PROJECT_PATH}
+Terminal=false
+Categories=Finance;Office;
+StartupWMClass=guanlan
+StartupNotify=true
+
+# 安装方法：
+# sed "s|\${PROJECT_PATH}|$(pwd)|g" guanlan.desktop > ~/.local/share/applications/guanlan.desktop

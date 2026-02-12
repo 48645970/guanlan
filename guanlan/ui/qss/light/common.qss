@@ -1,0 +1,108 @@
+/* 观澜量化 - 公共样式（浅色主题）
+ * 所有界面和窗口共用的基础样式
+ * 设计理念：清新玻璃感 + 紫蓝渐变强调色
+ */
+
+/* ===== 基础容器 ===== */
+QWidget {
+    background-color: transparent;
+}
+
+/* ===== 表单控件 ===== */
+QLineEdit, LineEdit {
+    background-color: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    color: #1a202c;
+    padding: 8px 12px;
+    selection-background-color: #7B68EE;
+}
+
+QLineEdit:focus, LineEdit:focus {
+    border: 2px solid #7B68EE;
+    background-color: white;
+}
+
+/* ===== 按钮（不含 PivotItem 等导航组件） ===== */
+PushButton {
+    background-color: rgba(123, 104, 238, 0.1);
+    border: 1px solid rgba(123, 104, 238, 0.25);
+    border-radius: 6px;
+    color: #4a5568;
+    padding: 8px 16px;
+}
+
+PushButton:hover {
+    background-color: rgba(123, 104, 238, 0.18);
+    border: 1px solid rgba(123, 104, 238, 0.4);
+}
+
+PushButton:pressed {
+    background-color: rgba(123, 104, 238, 0.25);
+}
+
+/* ===== 主要按钮（强调色） ===== */
+PrimaryPushButton {
+    background-color: #7B68EE;
+    border: none;
+    color: white;
+}
+
+PrimaryPushButton:hover {
+    background-color: #8B7CF0;
+}
+
+PrimaryPushButton:pressed {
+    background-color: #6A5ACD;
+}
+
+/* ===== 滚动条 ===== */
+QScrollBar:vertical {
+    background-color: transparent;
+    width: 8px;
+    margin: 0;
+}
+
+QScrollBar::handle:vertical {
+    background-color: rgba(123, 104, 238, 0.25);
+    min-height: 30px;
+    border-radius: 4px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: rgba(123, 104, 238, 0.4);
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QScrollBar:horizontal {
+    background-color: transparent;
+    height: 8px;
+    margin: 0;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: rgba(123, 104, 238, 0.25);
+    min-width: 30px;
+    border-radius: 4px;
+    margin: 2px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: rgba(123, 104, 238, 0.4);
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background: none;
+}
