@@ -156,3 +156,73 @@ def remove_favorite(favorites: list[str], symbol: str) -> None:
     if symbol in favorites:
         favorites.remove(symbol)
         save_favorites(favorites)
+
+
+def resolve_symbol(text: str) -> tuple[str, str, str] | None:
+    """从用户输入解析合约信息
+
+    支持输入格式：
+    - 品种代码：RU / ru → 使用主力合约
+    - 合约代码：ru2605 / RU2605 → 自动查找交易所
+    - 完整格式：ru2605.SHFE → 直接解析
+
+    Parameters
+    ----------
+    text : str
+        用户输入
+
+    Returns
+    -------
+    tuple[str, str, str] | None
+        (名称, vt_symbol, 交易所) 或 None
+    """
+    from vnpy.trader.constant import Exchange
+    from guanlan.core.utils.symbol_converter import SymbolConverter
+
+    text = text.strip()
+    if not text:
+        return None
+
+    # 已包含交易所后缀（如 ru2605.SHFE）
+    if "." in text:
+        symbol, exchange_str = text.rsplit(".", 1)
+        try:
+            exchange = Exchange(exchange_str)
+        except ValueError:
+            return None
+        standard = SymbolConverter.to_standard(symbol, exchange)
+        commodity = SymbolConverter.extract_commodity(standard)
+        contracts = load_contracts()
+        c = contracts.get(commodity, {})
+        name = c.get("name", commodity)
+        ex_symbol = SymbolConverter.to_exchange(standard, exchange)
+        return name, f"{ex_symbol}.{exchange_str}", exchange_str
+
+    commodity = SymbolConverter.extract_commodity(text)
+    if not commodity:
+        return None
+
+    contracts = load_contracts()
+    c = contracts.get(commodity)
+    if not c:
+        return None
+
+    name = c.get("name", commodity)
+    exchange_str = c.get("exchange", "")
+    if not exchange_str:
+        return None
+
+    exchange = Exchange(exchange_str)
+
+    # 纯字母 → 品种代码，使用主力合约
+    if text.isalpha():
+        main_symbol = c.get("vt_symbol", "")
+        if not main_symbol:
+            return None
+        ex_symbol = SymbolConverter.to_exchange(main_symbol, exchange)
+        return name, f"{ex_symbol}.{exchange_str}", exchange_str
+
+    # 带数字 → 具体合约代码
+    standard = SymbolConverter.to_standard(text, exchange)
+    ex_symbol = SymbolConverter.to_exchange(standard, exchange)
+    return name, f"{ex_symbol}.{exchange_str}", exchange_str

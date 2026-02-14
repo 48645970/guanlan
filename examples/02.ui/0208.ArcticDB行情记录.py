@@ -45,7 +45,7 @@ from qfluentwidgets import (
     MessageBoxBase, TitleLabel, DateTimeEdit
 )
 
-from guanlan.ui.widgets import GuanlanWindow
+from guanlan.ui.widgets.window import WebEngineFluentWidget
 
 # 尝试导入 lightweight_charts
 try:
@@ -1066,11 +1066,11 @@ class StatsDialog(MessageBoxBase):
 
 # ==================== 主窗口 ====================
 
-class ChartWindow(GuanlanWindow):
+class ChartWindow(WebEngineFluentWidget):
     """K 线图表窗口（增强版）"""
 
     def __init__(self):
-        super().__init__(enable_translucent_background=False)
+        super().__init__()
         self.setWindowTitle("ArcticDB 高级特性演示 - 观澜量化")
         self.resize(1400, 900)
 
@@ -1109,10 +1109,14 @@ class ChartWindow(GuanlanWindow):
 
     def _init_ui(self):
         """初始化界面"""
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        content = QWidget(self)
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, self.titleBar.height(), 0, 0)
+        layout.addWidget(content)
 
         # ===== 工具栏1: 基础操作 =====
         toolbar1 = QWidget()
@@ -1160,7 +1164,7 @@ class ChartWindow(GuanlanWindow):
         tb1_layout.addWidget(self.status_label)
 
         tb1_layout.addStretch()
-        layout.addWidget(toolbar1)
+        content_layout.addWidget(toolbar1)
 
         # ===== 工具栏2: 高级功能 =====
         toolbar2 = QWidget()
@@ -1214,13 +1218,11 @@ class ChartWindow(GuanlanWindow):
         tb2_layout.addWidget(tail_btn)
 
         tb2_layout.addStretch()
-        layout.addWidget(toolbar2)
+        content_layout.addWidget(toolbar2)
 
         # 创建图表
-        self.chart = QtChart(container)
-        layout.addWidget(self.chart.get_webview(), 1)
-
-        self.setCentralWidget(container)
+        self.chart = QtChart(content)
+        content_layout.addWidget(self.chart.get_webview(), 1)
 
     def _separator(self) -> QLabel:
         """创建分隔符"""

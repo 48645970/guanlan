@@ -25,6 +25,7 @@ from vnpy.trader.object import (
 from vnpy.trader.constant import Exchange, Direction, Offset, OrderType, Status
 from vnpy.trader.utility import get_digits
 
+from guanlan.core.setting import contract as contract_setting
 from guanlan.core.utils.symbol_converter import SymbolConverter
 from guanlan.core.services.sound import play as play_sound
 
@@ -107,6 +108,7 @@ class TradingPanel(QWidget):
         self.symbol_combo.setPlaceholderText("选择或输入后回车")
         self._load_favorites()
         self.symbol_combo.currentIndexChanged.connect(self._on_symbol_selected)
+        self.symbol_combo.returnPressed.connect(self._on_symbol_input)
         grid.addWidget(self.symbol_combo, row, 1, 1, 2)
 
         # 交易所
@@ -191,8 +193,6 @@ class TradingPanel(QWidget):
 
     def _load_favorites(self) -> None:
         """加载收藏品种到合约下拉列表"""
-        from guanlan.core.setting import contract as contract_setting
-
         contracts = contract_setting.load_contracts()
         favorites = contract_setting.load_favorites()
 
@@ -208,7 +208,7 @@ class TradingPanel(QWidget):
             symbol = vt_symbol.rsplit(".", 1)[0] if "." in vt_symbol else vt_symbol
 
             self.symbol_combo.addItem(
-                f"{name}  {vt_symbol}",
+                f"{name}  {symbol}",
                 userData={"symbol": symbol, "exchange": exchange, "name": name},
             )
 
@@ -216,7 +216,7 @@ class TradingPanel(QWidget):
         self.symbol_combo.setCurrentIndex(-1)
 
     def _on_symbol_selected(self, index: int) -> None:
-        """下拉选中收藏品种"""
+        """下拉选中收藏品种（有 userData 的项）"""
         if index < 0:
             return
         data = self.symbol_combo.itemData(index)
@@ -229,6 +229,60 @@ class TradingPanel(QWidget):
             ex_idx = self.exchange_combo.findText(exchange)
             if ex_idx >= 0:
                 self.exchange_combo.setCurrentIndex(ex_idx)
+
+        self._set_vt_symbol()
+
+    def _on_symbol_input(self) -> None:
+        """手动输入合约后回车
+
+        执行顺序：EditableComboBox 内部 _onReturnPressed 先执行，
+        会把裸文本（如 "OI"）addItem 到下拉列表。
+        本方法随后执行，检测到无 userData 的裸项后进行解析替换。
+        """
+        index = self.symbol_combo.currentIndex()
+        if index < 0:
+            return
+
+        # 已有 userData 说明是收藏项或已解析项，跳过
+        if self.symbol_combo.itemData(index):
+            return
+
+        text = self.symbol_combo.itemText(index)
+        resolved = contract_setting.resolve_symbol(text)
+
+        if not resolved:
+            # 解析失败：移除裸文本项，提示用户
+            self.symbol_combo.blockSignals(True)
+            self.symbol_combo.removeItem(index)
+            self.symbol_combo.setCurrentIndex(-1)
+            self.symbol_combo.blockSignals(False)
+            InfoBar.warning(
+                "合约未找到",
+                f"无法识别 \"{text}\"，请检查品种代码是否正确",
+                parent=self, duration=3000, position=InfoBarPosition.TOP,
+            )
+            return
+
+        name, vt_symbol, exchange_str = resolved
+
+        # 解析成功：用完整格式替换裸文本项
+        symbol_part = vt_symbol.rsplit(".", 1)[0] if "." in vt_symbol else vt_symbol
+        display = f"{name}  {symbol_part}"
+        self.symbol_combo.blockSignals(True)
+        self.symbol_combo.removeItem(index)
+        self.symbol_combo.addItem(
+            display,
+            userData={"symbol": symbol_part, "exchange": exchange_str, "name": name},
+        )
+        self.symbol_combo.setCurrentIndex(self.symbol_combo.count() - 1)
+        # setText 确保输入框显示完整格式
+        self.symbol_combo.setText(display)
+        self.symbol_combo.blockSignals(False)
+
+        # 设置交易所
+        ex_idx = self.exchange_combo.findText(exchange_str)
+        if ex_idx >= 0:
+            self.exchange_combo.setCurrentIndex(ex_idx)
 
         self._set_vt_symbol()
 

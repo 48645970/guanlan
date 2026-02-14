@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from vnpy.trader.constant import Offset
 from vnpy.trader.event import EVENT_ORDER, EVENT_TRADE, EVENT_TIMER
 from vnpy.trader.object import (
     ContractData, OrderData, TradeData, TickData,
@@ -101,6 +102,10 @@ class PortfolioEngine(BaseEngine):
 
         contract_result = self.contract_results.get(key)
         if not contract_result:
+            # 平仓成交但无对应开仓记录（如一键平仓、手动平仓），
+            # 说明开仓走的是其他 reference，此处不应创建幻影记录
+            if trade.offset in (Offset.CLOSE, Offset.CLOSETODAY, Offset.CLOSEYESTERDAY):
+                return
             contract_result = ContractResult(self, reference, vt_symbol, gateway_name)
             self.contract_results[key] = contract_result
 
@@ -186,6 +191,10 @@ class PortfolioEngine(BaseEngine):
                 commission = 0
                 date_changed = True
 
+            # 换日时跳过已平仓记录（last_pos == 0 且无持仓意义）
+            if pos == 0 and date != today:
+                continue
+
             self.result_symbols.add(vt_symbol)
             self.contract_results[(reference, vt_symbol, gateway_name)] = ContractResult(
                 self, reference, vt_symbol, gateway_name, pos, commission
@@ -199,6 +208,10 @@ class PortfolioEngine(BaseEngine):
         data: dict[str, Any] = {"date": get_trading_date()}
 
         for contract_result in self.contract_results.values():
+            # 跳过无持仓且无交易的空记录
+            if contract_result.last_pos == 0 and not contract_result.trades:
+                continue
+
             key = f"{contract_result.reference},{contract_result.vt_symbol},{contract_result.gateway_name}"
             data[key] = {
                 "open_pos": contract_result.open_pos,
@@ -237,6 +250,21 @@ class PortfolioEngine(BaseEngine):
         save_json_file(SETTING_FILENAME, setting)
 
     # ── 公共接口 ──
+
+    def remove_contract_result(self, reference: str, vt_symbol: str, gateway_name: str) -> None:
+        """移除指定合约统计记录并存盘"""
+        self.contract_results.pop((reference, vt_symbol, gateway_name), None)
+
+        # 若该组合下已无合约记录，同步清理组合级数据
+        portfolio_key = (reference, gateway_name)
+        has_children = any(
+            k[0] == reference and k[2] == gateway_name
+            for k in self.contract_results
+        )
+        if not has_children:
+            self.portfolio_results.pop(portfolio_key, None)
+
+        self._save_data()
 
     def set_timer_interval(self, interval: int) -> None:
         """设置刷新间隔"""

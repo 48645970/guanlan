@@ -239,6 +239,12 @@ class AIChatPanel(QWidget):
         self._streaming_bubble: _MessageBubble | None = None
 
         self._init_ui()
+        self._connect_signals()
+
+    def _connect_signals(self) -> None:
+        """连接信号"""
+        from guanlan.core.events import signal_bus
+        signal_bus.ai_models_changed.connect(self._reload_models)
 
     def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -319,6 +325,33 @@ class AIChatPanel(QWidget):
             idx = self._model_combo.findText(default)
             if idx >= 0:
                 self._model_combo.setCurrentIndex(idx)
+        except Exception:
+            self._model_combo.addItem("未配置")
+
+    def _reload_models(self) -> None:
+        """重新加载模型列表（响应配置变更）"""
+        # 保存当前选中的模型
+        current = self._model_combo.currentText()
+
+        # 清空并重新加载
+        self._model_combo.clear()
+        try:
+            from guanlan.core.services.ai import get_ai_client, reset_ai_client
+            # 重置 AI 客户端以重新加载配置
+            reset_ai_client()
+            ai = get_ai_client()
+            models = ai.list_models()
+            self._model_combo.addItems(models)
+
+            # 尝试恢复之前的选择，如果不存在则使用默认模型
+            idx = self._model_combo.findText(current)
+            if idx >= 0:
+                self._model_combo.setCurrentIndex(idx)
+            else:
+                default = ai.get_default_model()
+                idx = self._model_combo.findText(default)
+                if idx >= 0:
+                    self._model_combo.setCurrentIndex(idx)
         except Exception:
             self._model_combo.addItem("未配置")
 

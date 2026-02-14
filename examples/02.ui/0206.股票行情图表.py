@@ -32,7 +32,7 @@ from qfluentwidgets import (
     InfoBar, InfoBarPosition, FluentIcon
 )
 
-from guanlan.ui.widgets import GuanlanWindow
+from guanlan.ui.widgets.window import WebEngineFluentWidget
 
 # 尝试导入依赖库
 try:
@@ -97,12 +97,11 @@ class DataFetcher(QObject):
             self.error.emit(str(e))
 
 
-class StockChartWindow(GuanlanWindow):
+class StockChartWindow(WebEngineFluentWidget):
     """股票 K 线图窗口"""
 
     def __init__(self):
-        # 禁用透明背景，否则 WebEngineView 无法正常渲染
-        super().__init__(enable_translucent_background=False)
+        super().__init__()
         self.setWindowTitle("东财行情图表 - 观澜量化")
         self.resize(1200, 800)
 
@@ -111,11 +110,15 @@ class StockChartWindow(GuanlanWindow):
         self.fetcher.data_ready.connect(self._on_data_ready)
         self.fetcher.error.connect(self._on_error)
 
-        # 创建主容器
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        # 内容容器
+        content = QWidget(self)
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, self.titleBar.height(), 0, 0)
+        layout.addWidget(content)
 
         # 工具栏
         toolbar = QWidget()
@@ -149,7 +152,7 @@ class StockChartWindow(GuanlanWindow):
         toolbar_layout.addWidget(self.status_label)
 
         toolbar_layout.addStretch()
-        layout.addWidget(toolbar)
+        content_layout.addWidget(toolbar)
 
         # 创建图表容器
         self.chart_container = QWidget()
@@ -160,9 +163,7 @@ class StockChartWindow(GuanlanWindow):
         self.chart = QtChart(self.chart_container)
         chart_layout.addWidget(self.chart.get_webview(), 1)
 
-        layout.addWidget(self.chart_container, 1)
-
-        self.setCentralWidget(container)
+        content_layout.addWidget(self.chart_container, 1)
 
     def _fetch_data(self):
         """获取股票数据"""

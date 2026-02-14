@@ -15,20 +15,20 @@
 /* ===== 方向指示标签 ===== */
 #directionLabel {
     color: rgba(128, 128, 128, 0.8);
-    font-size: 22px;
+    font-size: 18px;
     font-weight: bold;
 }
 
 /* ===== 建议信息 ===== */
 #suggestLabel {
     color: rgba(0, 0, 0, 0.5);
-    font-size: 16px;
+    font-size: 13px;
 }
 
 /* ===== 提示文字 ===== */
 #tipLabel {
     color: rgba(0, 0, 0, 0.45);
-    font-size: 16px;
+    font-size: 13px;
 }
 
 /* ===== 底部卡片 ===== */

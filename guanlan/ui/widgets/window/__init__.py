@@ -7,8 +7,8 @@
 Author: 海山观澜
 """
 
-from .guanlan import GuanlanWindow
+from .webengine import WebEngineFluentWidget
 
 __all__ = [
-    'GuanlanWindow',
+    'WebEngineFluentWidget',
 ]

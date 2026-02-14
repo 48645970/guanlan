@@ -5,8 +5,4 @@
 Author: 海山观澜
 """
 
-from .guanlan import GuanlanTitleBar
-
-__all__ = [
-    'GuanlanTitleBar',
-]
+__all__: list[str] = []

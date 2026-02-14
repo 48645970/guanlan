@@ -1,0 +1,18 @@
+/* 危险操作按钮（浅色主题） */
+DangerPushButton {
+    background-color: rgba(220, 53, 69, 0.85);
+    border: 1px solid rgba(220, 53, 69, 0.5);
+    border-radius: 6px;
+    color: white;
+    padding: 2px 12px;
+    font-weight: bold;
+}
+
+DangerPushButton:hover {
+    background-color: rgba(220, 53, 69, 0.95);
+    border: 1px solid rgba(220, 53, 69, 0.7);
+}
+
+DangerPushButton:pressed {
+    background-color: rgba(185, 43, 57, 0.95);
+}

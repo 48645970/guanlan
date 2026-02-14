@@ -43,7 +43,7 @@ from qfluentwidgets import (
     InfoBar, InfoBarPosition, FluentIcon
 )
 
-from guanlan.ui.widgets import GuanlanWindow
+from guanlan.ui.widgets.window import WebEngineFluentWidget
 
 # 尝试导入 lightweight_charts
 try:
@@ -279,14 +279,14 @@ class KlineGenerator:
                 self.on_bar_callback(self.current_bar, is_new=False)
 
 
-class FuturesChartWindow(GuanlanWindow):
+class FuturesChartWindow(WebEngineFluentWidget):
     """期货实时 K 线图窗口"""
 
     tick_signal = Signal(object)
     log_signal = Signal(object)
 
     def __init__(self):
-        super().__init__(enable_translucent_background=False)
+        super().__init__()
         self.setWindowTitle("期货实时图表 - 观澜量化")
         self.resize(1200, 800)
 
@@ -346,10 +346,14 @@ class FuturesChartWindow(GuanlanWindow):
 
     def _init_ui(self):
         """初始化界面"""
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        content = QWidget(self)
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, self.titleBar.height(), 0, 0)
+        layout.addWidget(content)
 
         # 工具栏
         toolbar = QWidget()
@@ -420,7 +424,7 @@ class FuturesChartWindow(GuanlanWindow):
         toolbar_layout.addWidget(self.status_label)
 
         toolbar_layout.addStretch()
-        layout.addWidget(toolbar)
+        content_layout.addWidget(toolbar)
 
         # 创建图表容器
         chart_container = QWidget()
@@ -449,9 +453,7 @@ class FuturesChartWindow(GuanlanWindow):
 
         chart_layout.addWidget(self.chart.get_webview(), 1)
 
-        layout.addWidget(chart_container, 1)
-
-        self.setCentralWidget(container)
+        content_layout.addWidget(chart_container, 1)
 
     def _load_environments(self):
         """加载可用环境列表"""

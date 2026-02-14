@@ -57,6 +57,9 @@ def _setup(level: int = INFO) -> None:
     # 移除 loguru 默认的 stderr handler
     _logger.remove()
 
+    # 设置默认 extra，防止第三方库（如 VNPY）未 bind name 时 KeyError
+    _logger.configure(extra={"name": "unknown"})
+
     # 控制台彩色格式
     console_format = (
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "

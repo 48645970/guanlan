@@ -9,14 +9,16 @@ Author: 海山观澜
 """
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QHeaderView, QTreeWidgetItem,
 )
 
-from qfluentwidgets import TreeWidget, ComboBox, BodyLabel
+from qfluentwidgets import TreeWidget, ComboBox, BodyLabel, RoundMenu, FluentIcon, MessageBox
 
 from guanlan.core.trader.event import Event, EventEngine
 from guanlan.core.trader.pnl.engine import EVENT_PM_CONTRACT, EVENT_PM_PORTFOLIO
+from guanlan.ui.widgets.components.button import DangerPushButton
 
 
 def _long_color():
@@ -74,6 +76,12 @@ class PortfolioMonitor(QWidget):
             self._combos[field] = combo
             toolbar.addWidget(combo)
         toolbar.addStretch(1)
+
+        clear_btn = DangerPushButton("清空", self)
+        clear_btn.setFixedHeight(28)
+        clear_btn.clicked.connect(self._clear_all)
+        toolbar.addWidget(clear_btn)
+
         layout.addLayout(toolbar)
 
         self._tree = TreeWidget(self)
@@ -84,6 +92,8 @@ class PortfolioMonitor(QWidget):
         self._tree.header().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
+        self._tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._tree.customContextMenuRequested.connect(self._show_context_menu)
         layout.addWidget(self._tree, 1)
 
     def _register_events(self) -> None:
@@ -219,3 +229,79 @@ class PortfolioMonitor(QWidget):
                 item.setHidden(False)
                 for i in range(item.childCount()):
                     item.child(i).setHidden(False)
+
+    # ── 清空 / 右键菜单 ──
+
+    def _clear_all(self) -> None:
+        """清空所有盈亏记录（需确认）"""
+        msg = MessageBox("确认清空", "将清空所有盈亏统计记录，是否继续？", self.window())
+        if not msg.exec():
+            return
+
+        from guanlan.core.app import AppEngine
+
+        engine = AppEngine.instance().main_engine.engines["portfolio"]
+        engine.contract_results.clear()
+        engine.portfolio_results.clear()
+        engine._save_data()
+
+        self._contract_items.clear()
+        self._portfolio_items.clear()
+        self._tree.clear()
+
+    def _show_context_menu(self, pos) -> None:
+        """右键菜单：删除选中记录"""
+        item = self._tree.itemAt(pos)
+        if not item:
+            return
+
+        menu = RoundMenu(parent=self._tree)
+        menu.addAction(QAction(
+            FluentIcon.DELETE.icon(), "删除", self._tree,
+            triggered=lambda: self._delete_item(item),
+        ))
+        menu.exec(self._tree.viewport().mapToGlobal(pos))
+
+    def _delete_item(self, item: QTreeWidgetItem) -> None:
+        """删除记录（合约级或组合级）"""
+        from guanlan.core.app import AppEngine
+
+        engine = AppEngine.instance().main_engine.engines["portfolio"]
+        parent = item.parent()
+
+        if parent is None:
+            # 顶层节点（组合）：删除所有子合约
+            reference = item.text(0)
+            gateway_name = item.text(1)
+
+            for i in range(item.childCount()):
+                child = item.child(i)
+                vt_symbol = child.text(2)
+                self._contract_items.pop((reference, vt_symbol, gateway_name), None)
+                engine.contract_results.pop((reference, vt_symbol, gateway_name), None)
+
+            self._portfolio_items.pop((reference, gateway_name), None)
+            engine.portfolio_results.pop((reference, gateway_name), None)
+
+            idx = self._tree.indexOfTopLevelItem(item)
+            if idx >= 0:
+                self._tree.takeTopLevelItem(idx)
+        else:
+            # 子节点（合约）
+            reference = parent.text(0)
+            gateway_name = item.text(1)
+            vt_symbol = item.text(2)
+
+            self._contract_items.pop((reference, vt_symbol, gateway_name), None)
+            engine.contract_results.pop((reference, vt_symbol, gateway_name), None)
+            parent.removeChild(item)
+
+            # 父节点无子节点时一并移除
+            if parent.childCount() == 0:
+                self._portfolio_items.pop((reference, gateway_name), None)
+                engine.portfolio_results.pop((reference, gateway_name), None)
+                idx = self._tree.indexOfTopLevelItem(parent)
+                if idx >= 0:
+                    self._tree.takeTopLevelItem(idx)
+
+        engine._save_data()

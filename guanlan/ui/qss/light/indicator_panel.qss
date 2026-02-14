@@ -1,0 +1,21 @@
+/* 观澜量化 - 指标面板样式（浅色主题） */
+
+/* ===== 主图/副图标签 ===== */
+#overlayTag {
+    color: #0078d4;
+    border: 1px solid #0078d4;
+    border-radius: 4px;
+    padding: 1px 4px;
+}
+
+#subchartTag {
+    color: #e67e22;
+    border: 1px solid #e67e22;
+    border-radius: 4px;
+    padding: 1px 4px;
+}
+
+/* ===== 分隔线 ===== */
+#indicatorSep {
+    background-color: rgba(0, 0, 0, 0.06);
+}

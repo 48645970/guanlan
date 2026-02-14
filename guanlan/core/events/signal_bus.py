@@ -70,6 +70,9 @@ class SignalBus(QObject):
     play_sound = Signal(str)                     # 播放声音
     support_signal = Signal()                    # 打开支持页面
 
+    # ==================== AI 信号 ====================
+    ai_models_changed = Signal()                 # AI 模型列表变更
+
 
 # 全局单例
 signal_bus = SignalBus()

@@ -7,13 +7,11 @@
 Author: 海山观澜
 """
 
-from .title_bar import GuanlanTitleBar
 from .banner import HomeBanner, LinkCard, ModuleCard, LinkCardView
 from .card import FeatureCard, FeatureCardView, ModuleCard as ModuleCardWidget, ModuleCardView
 from .badge import StatusBadge
 
 __all__ = [
-    'GuanlanTitleBar',
     # Banner
     'HomeBanner',
     'LinkCard',

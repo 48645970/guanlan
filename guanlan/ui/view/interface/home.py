@@ -245,6 +245,14 @@ class HomeInterface(ThemeMixin, QWidget):
             signal_bus.switch_to_route
         )
 
+        self.banner.add_module_card(
+            FluentIcon.ROBOT,
+            "AI 配置",
+            "AI Settings",
+            "aiSettingsInterface",
+            signal_bus.switch_to_route
+        )
+
         self._portfolio_card = self.banner.add_module_card(
             FluentIcon.TILES,
             "组合策略",
@@ -274,6 +282,14 @@ class HomeInterface(ThemeMixin, QWidget):
             "辅助交易",
             "Advisor Trader",
             "advisorTraderInterface",
+            signal_bus.switch_to_route
+        )
+
+        self._chart_card = self.banner.add_module_card(
+            FluentIcon.MARKET,
+            "实时图表",
+            "Realtime Chart",
+            "realtimeChartInterface",
             signal_bus.switch_to_route
         )
 

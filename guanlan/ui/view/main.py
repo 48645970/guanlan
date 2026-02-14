@@ -12,13 +12,13 @@ import sys
 from datetime import datetime, timezone, timedelta
 
 from PySide6.QtCore import Qt, QSize, QTimer
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QCursor, QIcon
 from PySide6.QtWidgets import QApplication, QWidget
 
 from qfluentwidgets import (
     FluentWindow, NavigationItemPosition, SplashScreen,
     SystemThemeListener, isDarkTheme, InfoBar, InfoBarPosition,
-    BodyLabel,
+    BodyLabel, RoundMenu, Action,
 )
 from qfluentwidgets import FluentIcon as FIF
 
@@ -256,6 +256,9 @@ class MainWindow(FluentWindow):
         if route == "accountsInterface":
             self._show_account_manager()
             return
+        if route == "aiSettingsInterface":
+            self._show_ai_settings()
+            return
         if route == "ctaStrategyInterface":
             self._show_cta_manager()
             return
@@ -270,6 +273,9 @@ class MainWindow(FluentWindow):
             return
         if route == "advisorTraderInterface":
             self._show_advisor_trader()
+            return
+        if route == "realtimeChartInterface":
+            self._show_realtime_chart()
             return
         if route == "dataManagerInterface":
             self.switchTo(self.data_manager_interface)
@@ -412,6 +418,11 @@ class MainWindow(FluentWindow):
         from guanlan.ui.view.window import AccountManagerWindow
         self._show_persistent_window("account", AccountManagerWindow)
 
+    def _show_ai_settings(self) -> None:
+        """显示 AI 配置窗口"""
+        from guanlan.ui.view.window import AISettingsWindow
+        self._show_persistent_window("ai_settings", AISettingsWindow)
+
     def _show_cta_manager(self) -> None:
         """显示 CTA 策略管理窗口"""
         from guanlan.ui.view.window import CtaStrategyWindow
@@ -449,6 +460,75 @@ class MainWindow(FluentWindow):
         """辅助交易窗口关闭"""
         MainWindow._advisor_count = max(0, MainWindow._advisor_count - 1)
         self.home_interface._advisor_card.set_badge(MainWindow._advisor_count)
+
+    _chart_seq: int = 0
+    _chart_count: int = 0
+
+    def _show_realtime_chart(self) -> None:
+        """打开实时图表窗口（有方案时弹出菜单选择）"""
+        from guanlan.core.setting import chart_scheme
+
+        schemes = chart_scheme.load_schemes()
+        if not schemes:
+            self._open_chart_window()
+            return
+
+        menu = RoundMenu(parent=self)
+        menu.addAction(Action(FIF.ADD, "新建图表", triggered=self._open_chart_window))
+        menu.addAction(Action(
+            FIF.SETTING, "方案管理",
+            triggered=self._show_scheme_manager,
+        ))
+        menu.addSeparator()
+
+        for name, data in schemes.items():
+            action = Action(FIF.MARKET, name)
+            action.triggered.connect(lambda checked, d=data: self._open_chart_with_scheme(d))
+            menu.addAction(action)
+
+        menu.exec(QCursor.pos())
+
+    def _open_chart_window(self) -> None:
+        """打开空白图表窗口"""
+        MainWindow._chart_seq += 1
+        key = f"realtime_chart_{MainWindow._chart_seq}"
+
+        def factory():
+            from guanlan.ui.view.window.chart import ChartWindow
+            w = ChartWindow()
+            w.destroyed.connect(self._on_chart_closed)
+            return w
+
+        self._show_child_window(key, factory)
+        MainWindow._chart_count += 1
+        self.home_interface._chart_card.set_badge(MainWindow._chart_count)
+
+    def _open_chart_with_scheme(self, scheme_data: dict) -> None:
+        """使用方案打开图表窗口"""
+        MainWindow._chart_seq += 1
+        key = f"realtime_chart_{MainWindow._chart_seq}"
+
+        def factory():
+            from guanlan.ui.view.window.chart import ChartWindow
+            w = ChartWindow()
+            w.destroyed.connect(self._on_chart_closed)
+            w.apply_scheme(scheme_data)
+            return w
+
+        self._show_child_window(key, factory)
+        MainWindow._chart_count += 1
+        self.home_interface._chart_card.set_badge(MainWindow._chart_count)
+
+    def _show_scheme_manager(self) -> None:
+        """打开方案管理对话框"""
+        from guanlan.ui.view.window.chart.scheme_dialog import SchemeManagerDialog
+        dlg = SchemeManagerDialog(parent=self)
+        dlg.exec()
+
+    def _on_chart_closed(self) -> None:
+        """图表窗口关闭"""
+        MainWindow._chart_count = max(0, MainWindow._chart_count - 1)
+        self.home_interface._chart_card.set_badge(MainWindow._chart_count)
 
     def _show_portfolio_strategy_manager(self) -> None:
         """显示组合策略管理窗口"""

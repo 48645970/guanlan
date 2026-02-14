@@ -477,6 +477,23 @@ class PortfolioStrategyEngine(BaseEngine):
 
         self.strategies.pop(strategy_name)
 
+        # 清理盈亏统计中该策略的记录
+        reference = f"{APP_NAME}_{strategy_name}"
+        portfolio_engine = self.main_engine.engines.get("portfolio")
+        if portfolio_engine:
+            keys = [k for k in portfolio_engine.contract_results if k[0] == reference]
+            for k in keys:
+                portfolio_engine.contract_results.pop(k)
+            for k in list(portfolio_engine.portfolio_results):
+                if k[0] == reference:
+                    has_children = any(
+                        ck[0] == k[0] and ck[2] == k[1]
+                        for ck in portfolio_engine.contract_results
+                    )
+                    if not has_children:
+                        portfolio_engine.portfolio_results.pop(k)
+            portfolio_engine._save_data()
+
         self.write_log("移除成功", strategy=strategy)
         return True
 

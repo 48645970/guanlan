@@ -26,7 +26,7 @@ from qfluentwidgets import (
     FluentWidget, FluentIcon,
     PushButton, PrimaryPushButton,
     BodyLabel, SubtitleLabel,
-    ComboBox, SpinBox, LineEdit,
+    ComboBox, EditableComboBox, SpinBox, LineEdit,
     TableWidget, SegmentedWidget,
     SimpleCardWidget, ProgressRing,
     InfoBar, InfoBarPosition,
@@ -71,13 +71,13 @@ class SignalCard(SimpleCardWidget):
         super().__init__(parent)
         self.setObjectName("signalCard")
         self.setBorderRadius(8)
-        self.setFixedHeight(104)
+        self.setFixedHeight(90)
 
         self._direction: int = 0
         self._strength: int = 0
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(0)
 
         # 左侧：方向 + 提示（垂直居中）
@@ -99,7 +99,7 @@ class SignalCard(SimpleCardWidget):
 
         # 中央：ProgressRing 信号仪表
         self._ring = ProgressRing(self, useAni=False)
-        self._ring.setFixedSize(80, 80)
+        self._ring.setFixedSize(64, 64)
         self._ring.setRange(0, 100)
         self._ring.setValue(0)
         self._ring.setTextVisible(True)
@@ -377,7 +377,7 @@ class AdvisorTraderWindow(CursorFixMixin, FluentWidget):
     def _init_ui(self) -> None:
         """初始化界面"""
         self.setWindowTitle("辅助交易")
-        self.resize(760, 600)
+        self.resize(380, 480)
 
         # 标题栏
         self.titleBar.setFixedHeight(48)
@@ -396,7 +396,7 @@ class AdvisorTraderWindow(CursorFixMixin, FluentWidget):
         self._content.setObjectName("dialogContent")
 
         content_layout = QVBoxLayout(self._content)
-        content_layout.setContentsMargins(16, 8, 16, 8)
+        content_layout.setContentsMargins(10, 8, 10, 8)
         content_layout.setSpacing(8)
 
         layout = QVBoxLayout(self)
@@ -414,84 +414,82 @@ class AdvisorTraderWindow(CursorFixMixin, FluentWidget):
         toolbar_card_layout.setContentsMargins(12, 8, 12, 8)
         toolbar_card_layout.setSpacing(6)
 
-        toolbar = QHBoxLayout()
-        toolbar.setSpacing(6)
+        # 第一行：账户 | 合约（各占一半）
+        row1 = QHBoxLayout()
+        row1.setSpacing(6)
 
-        # 账户
-        toolbar.addWidget(BodyLabel("账户"))
+        row1.addWidget(BodyLabel("账户"))
         self._gateway_combo = ComboBox(self)
-        self._gateway_combo.setMinimumWidth(100)
-        toolbar.addWidget(self._gateway_combo)
+        row1.addWidget(self._gateway_combo, 1)
 
-        # 合约
-        toolbar.addWidget(BodyLabel("合约"))
-        self._symbol_combo = ComboBox(self)
-        self._symbol_combo.setMinimumWidth(160)
-        toolbar.addWidget(self._symbol_combo)
+        row1.addWidget(BodyLabel("合约"))
+        self._symbol_combo = EditableComboBox(self)
+        row1.addWidget(self._symbol_combo, 1)
 
-        # 策略
-        toolbar.addWidget(BodyLabel("策略"))
+        toolbar_card_layout.addLayout(row1)
+
+        # 第二行：策略 | 参数 | 初始化 | 启动 | 停止
+        row2 = QHBoxLayout()
+        row2.setSpacing(6)
+
+        row2.addWidget(BodyLabel("策略"))
         self._strategy_combo = ComboBox(self)
-        self._strategy_combo.setMinimumWidth(140)
-        toolbar.addWidget(self._strategy_combo)
+        row2.addWidget(self._strategy_combo, 1)
 
-        # 参数按钮
         self._btn_params = PushButton("参数", self)
         self._btn_params.setEnabled(False)
         self._btn_params.clicked.connect(self._on_edit_params)
-        toolbar.addWidget(self._btn_params)
+        row2.addWidget(self._btn_params)
 
-        # 初始化按钮
         self._btn_init = PrimaryPushButton("初始化", self)
         self._btn_init.setEnabled(False)
         self._btn_init.clicked.connect(self._on_init_strategy)
-        toolbar.addWidget(self._btn_init)
+        row2.addWidget(self._btn_init)
 
-        # 启动/停止按钮
         self._btn_start = PrimaryPushButton("启动", self)
         self._btn_start.setEnabled(False)
         self._btn_start.clicked.connect(self._on_start_strategy)
-        toolbar.addWidget(self._btn_start)
+        row2.addWidget(self._btn_start)
 
         self._btn_stop = PrimaryPushButton("停止", self)
         self._btn_stop.setEnabled(False)
         self._btn_stop.clicked.connect(self._on_stop_strategy)
-        toolbar.addWidget(self._btn_stop)
+        row2.addWidget(self._btn_stop)
 
-        toolbar_card_layout.addLayout(toolbar)
+        self._btn_chart = PushButton("图表", self)
+        self._btn_chart.setIcon(FluentIcon.MARKET)
+        self._btn_chart.clicked.connect(self._on_open_chart)
+        row2.addWidget(self._btn_chart)
 
-        # 工具栏第二行
-        toolbar2 = QHBoxLayout()
-        toolbar2.setSpacing(6)
+        toolbar_card_layout.addLayout(row2)
 
-        # 价格类型
-        toolbar2.addWidget(BodyLabel("价格"))
+        # 第三行：价格
+        row3 = QHBoxLayout()
+        row3.setSpacing(6)
+
+        row3.addWidget(BodyLabel("价格"))
         self._price_type_combo = ComboBox(self)
         for pt in PriceType:
             self._price_type_combo.addItem(pt.value, userData=pt)
         self._price_type_combo.currentIndexChanged.connect(self._on_price_type_changed)
-        toolbar2.addWidget(self._price_type_combo)
+        row3.addWidget(self._price_type_combo, 1)
 
-        # 数量
-        toolbar2.addWidget(BodyLabel("数量"))
+        row3.addWidget(BodyLabel("数量"))
         self._volume_spin = SpinBox(self)
         self._volume_spin.setMinimum(1)
         self._volume_spin.setMaximum(100)
         self._volume_spin.setValue(1)
-        toolbar2.addWidget(self._volume_spin)
+        row3.addWidget(self._volume_spin, 1)
 
-        toolbar2.addSpacing(12)
-        toolbar2.addWidget(BodyLabel("持仓"))
+        row3.addWidget(BodyLabel("持仓"))
         self._pos_edit = LineEdit(self)
         self._pos_edit.setObjectName("posEdit")
         self._pos_edit.setReadOnly(True)
-        self._pos_edit.setFixedWidth(80)
         self._pos_edit.setText("0")
         self._pos_edit.setAlignment(Qt.AlignCenter)
-        toolbar2.addWidget(self._pos_edit)
+        row3.addWidget(self._pos_edit, 1)
 
-        toolbar2.addStretch(1)
-        toolbar_card_layout.addLayout(toolbar2)
+        toolbar_card_layout.addLayout(row3)
 
         content_layout.addWidget(toolbar_card)
 
@@ -568,7 +566,8 @@ class AdvisorTraderWindow(CursorFixMixin, FluentWidget):
 
         # 下拉框联动
         self._gateway_combo.currentIndexChanged.connect(self._on_symbol_changed)
-        self._symbol_combo.currentIndexChanged.connect(self._on_symbol_changed)
+        self._symbol_combo.currentIndexChanged.connect(self._on_symbol_selected)
+        self._symbol_combo.returnPressed.connect(self._on_symbol_input)
         self._strategy_combo.currentIndexChanged.connect(self._on_strategy_class_changed)
 
     # ── 样式 ──
@@ -607,7 +606,7 @@ class AdvisorTraderWindow(CursorFixMixin, FluentWidget):
             symbol = vt_symbol.rsplit(".", 1)[0] if "." in vt_symbol else vt_symbol
             ex_symbol = SymbolConverter.to_exchange(symbol, Exchange(exchange))
             full_vt = f"{ex_symbol}.{exchange}"
-            self._symbol_combo.addItem(f"{name}  {vt_symbol}", userData=full_vt)
+            self._symbol_combo.addItem(f"{name}  {ex_symbol}", userData=full_vt)
 
         self._symbol_combo.setCurrentIndex(-1)
 
@@ -647,6 +646,51 @@ class AdvisorTraderWindow(CursorFixMixin, FluentWidget):
             pass
 
     # ── 下拉框联动 ──
+
+    def _on_symbol_selected(self, index: int) -> None:
+        """下拉选择合约（有 userData 的收藏项）"""
+        if index < 0:
+            return
+        if not self._symbol_combo.itemData(index):
+            return
+        self._on_symbol_changed()
+
+    def _on_symbol_input(self) -> None:
+        """手动输入合约代码回车后解析"""
+        from guanlan.core.setting import contract as contract_setting
+
+        index = self._symbol_combo.currentIndex()
+        if index < 0:
+            return
+        if self._symbol_combo.itemData(index):
+            return
+
+        text = self._symbol_combo.itemText(index)
+        resolved = contract_setting.resolve_symbol(text)
+
+        if not resolved:
+            self._symbol_combo.blockSignals(True)
+            self._symbol_combo.removeItem(index)
+            self._symbol_combo.setCurrentIndex(-1)
+            self._symbol_combo.blockSignals(False)
+            InfoBar.warning(
+                "合约未找到", f"无法识别 \"{text}\"",
+                parent=self, position=InfoBarPosition.TOP,
+            )
+            return
+
+        name, vt_symbol, _exchange = resolved
+        symbol_part = vt_symbol.rsplit(".", 1)[0] if "." in vt_symbol else vt_symbol
+        display = f"{name}  {symbol_part}"
+
+        self._symbol_combo.blockSignals(True)
+        self._symbol_combo.removeItem(index)
+        self._symbol_combo.addItem(display, userData=vt_symbol)
+        self._symbol_combo.setCurrentIndex(self._symbol_combo.count() - 1)
+        self._symbol_combo.setText(display)
+        self._symbol_combo.blockSignals(False)
+
+        self._on_symbol_changed()
 
     def _on_symbol_changed(self) -> None:
         """合约或账户变化"""
@@ -869,6 +913,15 @@ class AdvisorTraderWindow(CursorFixMixin, FluentWidget):
                 "参数已更新", "需要重新初始化策略使参数生效",
                 parent=self, position=InfoBarPosition.TOP, duration=2000,
             )
+
+    def _on_open_chart(self) -> None:
+        """打开图表窗口"""
+        from guanlan.ui.view.window.chart import ChartWindow
+
+        chart = ChartWindow(parent=None)
+        if self._vt_symbol:
+            chart.set_symbol(self._vt_symbol)
+        chart.show()
 
     # ── 信号回调 ──
 

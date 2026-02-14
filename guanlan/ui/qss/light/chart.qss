@@ -1,0 +1,26 @@
+/* 观澜量化 - 图表窗口样式（浅色主题） */
+
+/* ===== 工具栏 ===== */
+#chartToolbar {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* ===== 合约标签 ===== */
+#symbolLabel {
+    color: #B8860B;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* ===== 状态标签 ===== */
+#statusLabel {
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 12px;
+}
+
+/* ===== 缩放按钮组 ===== */
+#zoomPanel {
+    background-color: rgba(245, 245, 245, 0.6);
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}

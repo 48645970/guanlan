@@ -25,7 +25,7 @@ from qfluentwidgets import (
     FluentIcon, FluentWidget,
     PushButton, PrimaryPushButton,
     BodyLabel, SubtitleLabel,
-    LineEdit, ComboBox, SpinBox, DoubleSpinBox, SwitchButton,
+    LineEdit, ComboBox, EditableComboBox, SpinBox, DoubleSpinBox, SwitchButton,
     TableWidget, CardWidget, ScrollArea,
     MessageBoxBase,
     InfoBar, InfoBarPosition,
@@ -94,10 +94,13 @@ class PortfolioSettingEditor(MessageBoxBase):
             form.addRow(BodyLabel("合约列表", self), symbols_edit)
             self._edits["symbols"] = (symbols_edit, str)
 
-            # 合约快速添加（从收藏选择）
-            self._favorites_combo = ComboBox(self)
-            self._favorites_combo.setPlaceholderText("从收藏品种选择添加")
+            # 合约快速添加（从收藏选择或手动输入）
+            self._favorites_combo = EditableComboBox(self)
+            self._favorites_combo.setPlaceholderText("选择收藏或输入品种代码")
             self._load_favorites(self._favorites_combo)
+            self._favorites_combo.returnPressed.connect(
+                lambda se=symbols_edit: self._on_symbol_input(se)
+            )
 
             btn_append = PushButton("追加", self)
             btn_append.setFixedWidth(60)
@@ -202,7 +205,7 @@ class PortfolioSettingEditor(MessageBoxBase):
 
         return setting
 
-    def _append_symbol(self, symbols_edit: LineEdit, combo: ComboBox) -> None:
+    def _append_symbol(self, symbols_edit: LineEdit, combo: EditableComboBox) -> None:
         """将收藏品种追加到合约列表"""
         idx = combo.currentIndex()
         if idx < 0:
@@ -222,7 +225,7 @@ class PortfolioSettingEditor(MessageBoxBase):
 
         combo.setCurrentIndex(-1)
 
-    def _load_favorites(self, combo: ComboBox) -> None:
+    def _load_favorites(self, combo: EditableComboBox) -> None:
         """加载收藏品种到合约下拉列表"""
         from guanlan.core.setting import contract as contract_setting
 
@@ -238,6 +241,45 @@ class PortfolioSettingEditor(MessageBoxBase):
             combo.addItem(f"{name}  {key}", userData=key)
 
         combo.setCurrentIndex(-1)
+
+    def _on_symbol_input(self, symbols_edit: LineEdit) -> None:
+        """手动输入品种代码回车后解析并追加到合约列表"""
+        from guanlan.core.setting import contract as contract_setting
+        from guanlan.core.utils.symbol_converter import SymbolConverter
+
+        combo = self._favorites_combo
+        index = combo.currentIndex()
+        if index < 0:
+            return
+        if combo.itemData(index):
+            return
+
+        text = combo.itemText(index)
+        resolved = contract_setting.resolve_symbol(text)
+
+        # 清除裸文本项
+        combo.blockSignals(True)
+        combo.removeItem(index)
+        combo.setCurrentIndex(-1)
+        combo.blockSignals(False)
+
+        if not resolved:
+            InfoBar.warning(
+                "合约未找到", f"无法识别 \"{text}\"",
+                parent=self, position=InfoBarPosition.TOP,
+            )
+            return
+
+        name, vt_symbol, _exchange = resolved
+        symbol_part = vt_symbol.rsplit(".", 1)[0] if "." in vt_symbol else vt_symbol
+        commodity = SymbolConverter.extract_commodity(symbol_part)
+
+        # 追加到合约列表
+        current = symbols_edit.text().strip()
+        if current:
+            symbols_edit.setText(f"{current},{commodity}")
+        else:
+            symbols_edit.setText(commodity)
 
 
 class PortfolioCard(CardWidget):

@@ -179,6 +179,10 @@ class StrategyManager(CardWidget):
         self._btn_remove = PrimaryPushButton("移除", self)
         self._btn_remove.clicked.connect(self._on_remove)
 
+        self._btn_chart = PushButton("图表", self)
+        self._btn_chart.setIcon(FluentIcon.MARKET)
+        self._btn_chart.clicked.connect(self._on_open_chart)
+
         btn_layout = QHBoxLayout()
         btn_layout.addWidget(self._btn_init)
         btn_layout.addWidget(self._btn_start)
@@ -186,6 +190,7 @@ class StrategyManager(CardWidget):
         btn_layout.addWidget(self._btn_edit)
         btn_layout.addWidget(self._btn_reset)
         btn_layout.addWidget(self._btn_remove)
+        btn_layout.addWidget(self._btn_chart)
 
         # 参数、状态和信号表
         self._params_monitor = DataMonitor(self._data["params"], self)
@@ -260,6 +265,16 @@ class StrategyManager(CardWidget):
         if result:
             self._cta_window.remove_strategy(self.strategy_name)
 
+    def _on_open_chart(self) -> None:
+        """打开图表窗口，带入策略绑定的合约"""
+        from guanlan.ui.view.window.chart import ChartWindow
+
+        vt_symbol = self._data.get("vt_symbol", "")
+        chart = ChartWindow(parent=None)
+        if vt_symbol:
+            chart.set_symbol(vt_symbol)
+        chart.show()
+
 
 class SettingEditor(MessageBoxBase):
     """策略参数编辑器
@@ -309,10 +324,13 @@ class SettingEditor(MessageBoxBase):
             form.addRow(BodyLabel("策略名称", self), name_edit)
             self._edits["strategy_name"] = (name_edit, str)
 
-            # 合约选择（加载收藏品种）
+            # 合约选择（加载收藏品种，支持手动输入）
             symbol_edit = EditableComboBox(self)
             symbol_edit.setPlaceholderText("选择或输入品种代码")
             self._load_favorites(symbol_edit)
+            symbol_edit.returnPressed.connect(
+                lambda combo=symbol_edit: self._on_symbol_input(combo)
+            )
             form.addRow(BodyLabel("交易合约", self), symbol_edit)
             self._edits["symbol"] = (symbol_edit, "combo")
 
@@ -425,6 +443,44 @@ class SettingEditor(MessageBoxBase):
             combo.addItem(f"{name}  {key}", userData=key)
 
         combo.setCurrentIndex(-1)
+
+    def _on_symbol_input(self, combo: EditableComboBox) -> None:
+        """手动输入合约代码回车后解析"""
+        from guanlan.core.setting import contract as contract_setting
+        from guanlan.core.utils.symbol_converter import SymbolConverter
+
+        index = combo.currentIndex()
+        if index < 0:
+            return
+        if combo.itemData(index):
+            return
+
+        text = combo.itemText(index)
+        resolved = contract_setting.resolve_symbol(text)
+
+        if not resolved:
+            combo.blockSignals(True)
+            combo.removeItem(index)
+            combo.setCurrentIndex(-1)
+            combo.blockSignals(False)
+            InfoBar.warning(
+                "合约未找到", f"无法识别 \"{text}\"",
+                parent=self, position=InfoBarPosition.TOP,
+            )
+            return
+
+        name, vt_symbol, _exchange = resolved
+        # CTA 使用品种代码作为标识
+        symbol_part = vt_symbol.rsplit(".", 1)[0] if "." in vt_symbol else vt_symbol
+        commodity = SymbolConverter.extract_commodity(symbol_part)
+
+        display = f"{name}  {commodity}"
+        combo.blockSignals(True)
+        combo.removeItem(index)
+        combo.addItem(display, userData=commodity)
+        combo.setCurrentIndex(combo.count() - 1)
+        combo.setText(display)
+        combo.blockSignals(False)
 
 class CtaStrategyWindow(CursorFixMixin, FluentWidget):
     """CTA 策略管理窗口（卡片式布局）"""

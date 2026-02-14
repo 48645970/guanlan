@@ -14,6 +14,10 @@ from .kline import (
     KLINE_IMAGE_SYSTEM,
     format_kline_prompt,
 )
+from .chart import (
+    CHART_ANALYSIS_SYSTEM,
+    format_chart_analysis_prompt,
+)
 
 __all__ = [
     "MARKET_ANALYSIS_SYSTEM",
@@ -21,4 +25,6 @@ __all__ = [
     "KLINE_ANALYSIS_SYSTEM",
     "KLINE_IMAGE_SYSTEM",
     "format_kline_prompt",
+    "CHART_ANALYSIS_SYSTEM",
+    "format_chart_analysis_prompt",
 ]

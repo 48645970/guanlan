@@ -8,10 +8,12 @@ Author: 海山观澜
 from .account import load_config as load_account_config
 from .contract import load_contracts, load_favorites
 from .risk import RISK_RULES
+from . import chart
 
 __all__ = [
     'load_account_config',
     'load_contracts',
     'load_favorites',
     'RISK_RULES',
+    'chart',
 ]

@@ -5,7 +5,7 @@
 Author: 海山观澜
 """
 
-from PySide6.QtCore import Qt, QEvent, QRect
+from PySide6.QtCore import Qt, QEvent, QRect, QPoint
 
 from qfluentwidgets import qconfig, isDarkTheme
 
@@ -34,22 +34,13 @@ class CursorFixMixin:
         if et == QEvent.MouseMove:
             if not self.isVisible():
                 return False
-            global_pos = event.globalPos()
-            win_rect = QRect(self.pos(), self.size())
-            if not win_rect.contains(global_pos):
+            # 将全局鼠标位置转换为窗口内的相对位置
+            local_pos = self.mapFromGlobal(event.globalPos())
+            # 检查相对位置是否在窗口矩形内
+            if not self.rect().contains(local_pos):
                 return False
 
         return super().eventFilter(obj, event)
-
-    def closeEvent(self, event) -> None:
-        """隐藏窗口前重置标题栏按钮状态"""
-        from qframelesswindow.titlebar.title_bar_buttons import (
-            TitleBarButton, TitleBarButtonState,
-        )
-        for btn in self.titleBar.findChildren(TitleBarButton):
-            btn.setState(TitleBarButtonState.NORMAL)
-        event.ignore()
-        self.hide()
 
 
 class ThemeMixin:

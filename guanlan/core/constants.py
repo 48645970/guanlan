@@ -62,6 +62,12 @@ DEFAULT_WINDOW_WIDTH = 1680
 DEFAULT_WINDOW_HEIGHT = 960
 MIN_WINDOW_WIDTH = 1230
 
+# 图表配色（中国惯例：红涨绿跌）
+COLOR_UP = "#EF5350"          # 涨 / 做多 — 红色
+COLOR_DOWN = "#26A69A"        # 跌 / 做空 — 绿色
+COLOR_UP_ALPHA = "rgba(239, 83, 80, 0.5)"    # 涨（半透明，量能柱用）
+COLOR_DOWN_ALPHA = "rgba(38, 166, 154, 0.5)"  # 跌（半透明，量能柱用）
+
 
 
 # ============================================================================

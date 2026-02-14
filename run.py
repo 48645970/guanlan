@@ -40,6 +40,9 @@ def main() -> None:
         os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
         os.environ["QT_SCALE_FACTOR"] = str(dpi_scale)
 
+    # QWebEngineView 要求在 QApplication 创建前设置共享 OpenGL 上下文
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+
     # 创建应用程序
     app = QApplication(sys.argv)
     app.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings)

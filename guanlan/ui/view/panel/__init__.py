@@ -18,6 +18,7 @@ from .trading import TradingPanel
 from .pnl import PortfolioMonitor
 from .risk import RiskMonitor
 from .ai_chat import AIChatPanel
+from .chart_analysis import ChartAnalysisPanel
 
 
 # ── 交易方向颜色（多/空） ──
@@ -49,6 +50,7 @@ __all__ = [
     "PortfolioMonitor",
     "RiskMonitor",
     "AIChatPanel",
+    "ChartAnalysisPanel",
     "long_color",
     "short_color",
     "LEVEL_COLORS",

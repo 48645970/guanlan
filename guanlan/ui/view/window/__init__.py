@@ -7,6 +7,7 @@ Author: 海山观澜
 
 from .account import AccountManagerWindow
 from .advisor_trader import AdvisorTraderWindow
+from .ai_settings import AISettingsWindow
 from .backtest import BacktestWindow
 from .contract import ContractEditDialog
 from .cta import CtaStrategyWindow
@@ -18,6 +19,7 @@ from .script import ScriptTraderWindow
 __all__ = [
     'AccountManagerWindow',
     'AdvisorTraderWindow',
+    'AISettingsWindow',
     'BacktestWindow',
     'ContractEditDialog',
     'CtaStrategyWindow',
