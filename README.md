@@ -2,7 +2,7 @@
 
 > 心在山海之外，方能观其全貌
 
-基于 [VNPY 4.3](https://www.vnpy.com/) 个性定制的中国期货量化交易桌面平台。专注于**更人性化的操作体验**，在策略架构、交易流程和日常运维等方面做了诸多改进，是一个适合学习和实践的量化交易开源项目。
+基于 [VNPY 4.3](https://www.vnpy.com/) 定制的中国期货量化交易桌面平台。专注于**个性化的操作体验**与**策略执行效果的直观呈现**，在策略架构、交易流程和日常运维等方面做了诸多修改。
 
 采用 PySide6 + [QFluentWidgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) 构建现代化 Fluent Design 界面。
 

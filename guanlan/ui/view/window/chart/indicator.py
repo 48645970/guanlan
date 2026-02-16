@@ -152,7 +152,20 @@ class IndicatorManager:
             lines = self._overlay_lines.get(name, {})
             for line in lines.values():
                 if line:
-                    self._chart.run_script(f"{self._chart.id}.chart.removeSeries({line.id}.series);")
+                    # 清理 Legend 条目 + 移除 Series
+                    self._chart.run_script(f"""
+                        var _li = {self._chart.id}.legend._lines.find(
+                            function(l) {{ return l.series === {line.id}.series; }}
+                        );
+                        if (_li) {{
+                            {self._chart.id}.legend._lines =
+                                {self._chart.id}.legend._lines.filter(
+                                    function(l) {{ return l !== _li; }}
+                                );
+                            _li.row.remove();
+                        }}
+                        {self._chart.id}.chart.removeSeries({line.id}.series);
+                    """)
 
         # 2. 删除副图及其所有线
         else:

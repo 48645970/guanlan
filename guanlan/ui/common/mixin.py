@@ -42,6 +42,16 @@ class CursorFixMixin:
 
         return super().eventFilter(obj, event)
 
+    def closeEvent(self, event) -> None:
+        """隐藏窗口前重置标题栏按钮状态"""
+        from qframelesswindow.titlebar.title_bar_buttons import (
+            TitleBarButton, TitleBarButtonState,
+        )
+        for btn in self.titleBar.findChildren(TitleBarButton):
+            btn.setState(TitleBarButtonState.NORMAL)
+        event.ignore()
+        self.hide()
+
 
 class ThemeMixin:
     """
