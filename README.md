@@ -285,6 +285,7 @@ guanlan/
 ├── guanlan/                  # 主程序包
 │   ├── core/                 # 核心业务逻辑
 │   │   ├── app.py            # 全局引擎（单例，多账户管理）
+│   │   ├── indicators/       # 图表指标基类与注册表
 │   │   ├── services/         # 服务层（AI、提醒、行情、日历、定时任务）
 │   │   ├── setting/          # 配置管理（账户、合约、手续费、风控）
 │   │   └── trader/           # 交易引擎
@@ -301,9 +302,13 @@ guanlan/
 │       │   ├── main.py       # 主窗口
 │       │   ├── interface/    # 页面（首页、设置、合约等）
 │       │   ├── panel/        # 面板（日志、持仓、风控、AI 等）
-│       │   └── window/       # 弹窗（辅助交易、回测等）
+│       │   └── window/       # 弹窗
+│       │       ├── chart/    # 实时行情图表（多周期、指标、AI 分析）
+│       │       ├── cta.py    # CTA 策略管理
+│       │       └── ...       # 辅助交易、回测、合约等
 │       ├── widgets/          # 自定义组件
 │       └── qss/              # 样式表（深色/浅色主题）
+├── indicators/               # 图表指标插件（MA、MACD、RSI、布林带等）
 ├── strategies/               # 策略目录
 │   ├── cta/                  # CTA 策略示例
 │   ├── portfolio/            # 组合策略示例
