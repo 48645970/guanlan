@@ -151,6 +151,9 @@ class GuanlanConfig(QConfig):
     autoDownloadData = ConfigItem("AutoTask", "DownloadData", True, BoolValidator())
     autoDataRecording = ConfigItem("AutoTask", "DataRecording", False, BoolValidator())
 
+    # ==================== 数据配置 ====================
+    tdxPath = ConfigItem("Data", "TdxPath", "")
+
     # ==================== 更新配置 ====================
     checkUpdateAtStartUp = ConfigItem("Update", "CheckUpdateAtStartUp", True, BoolValidator())
 

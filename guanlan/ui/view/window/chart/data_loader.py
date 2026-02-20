@@ -76,8 +76,10 @@ class ChartDataLoader:
             return []
 
         if period.is_second:
-            # 秒级周期：必须从 tick 合成
-            minutes_needed = period.history_minutes(count)
+            # 秒级周期：必须从 tick 合成（全部模式取最近一天）
+            minutes_needed = period.history_minutes(
+                count if count > 0 else 1440
+            )
             end = datetime.now()
             start = end - timedelta(minutes=minutes_needed)
             temp_bars = self._load_from_tick(
@@ -94,7 +96,7 @@ class ChartDataLoader:
                 symbol, exchange, period, count,
             )
             # bar 数据不存在时，尝试从 tick 合成
-            if not temp_bars:
+            if not temp_bars and count > 0:
                 minutes_needed = period.history_minutes(count)
                 end = datetime.now()
                 start = end - timedelta(minutes=minutes_needed)
@@ -105,8 +107,8 @@ class ChartDataLoader:
         if not temp_bars:
             return []
 
-        # 只取最后 N 根
-        if len(temp_bars) > count:
+        # 只取最后 N 根（-1 表示全部）
+        if count > 0 and len(temp_bars) > count:
             temp_bars = temp_bars[-count:]
 
         return [bar_to_dict(b) for b in temp_bars]
@@ -123,8 +125,6 @@ class ChartDataLoader:
         1 分钟模式直接取最后 count 条；
         多分钟窗口先加载足够的 1 分钟 bar，再通过生成器合成。
         """
-        bars_needed = count * period.window if period.is_window else count
-
         key = f"{symbol}.{exchange.value}.{Interval.MINUTE.value}"
         if not self._database.bar_lib.has_symbol(key):
             return []
@@ -134,7 +134,10 @@ class ChartDataLoader:
         if df.empty:
             return []
 
-        df = df.tail(bars_needed)
+        # count == -1 表示全部
+        if count > 0:
+            bars_needed = count * period.window if period.is_window else count
+            df = df.tail(bars_needed)
 
         bars_1m: list[BarData] = []
         for tp in df.itertuples():
@@ -189,8 +192,10 @@ class ChartDataLoader:
         if df.empty:
             return []
 
-        bars_needed = count * max(period.window, 1)
-        df = df.tail(bars_needed)
+        # count == -1 表示全部
+        if count > 0:
+            bars_needed = count * max(period.window, 1)
+            df = df.tail(bars_needed)
 
         daily_bars: list[BarData] = []
         for tp in df.itertuples():

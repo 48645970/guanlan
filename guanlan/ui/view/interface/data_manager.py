@@ -21,7 +21,8 @@ from qfluentwidgets import (
     PushButton, PrimaryPushButton,
     PrimaryDropDownPushButton, RoundMenu, Action,
     TreeWidget, TableWidget, DateEdit,
-    InfoBar, InfoBarPosition,
+    CheckBox, IndeterminateProgressBar,
+    InfoBar, InfoBarIcon, InfoBarPosition,
     MessageBox, StateToolTip,
     FluentIcon,
 )
@@ -33,6 +34,7 @@ from guanlan.core.constants import Interval, Exchange
 from guanlan.core.events.signal_bus import signal_bus
 from guanlan.core.setting.contract import load_contracts
 from guanlan.core.utils.symbol_converter import SymbolConverter
+from guanlan.core.services.tdx import TdxService, TdxFileInfo
 
 # 周期名称映射
 INTERVAL_NAME_MAP: dict[Interval, str] = {
@@ -46,27 +48,41 @@ INTERVAL_NAME_MAP: dict[Interval, str] = {
 # 工作线程
 # ────────────────────────────────────────────────────────────
 
-class TdxImportThread(QThread):
-    """通达信导入工作线程"""
+class TdxLocalImportThread(QThread):
+    """通达信本地二进制文件导入线程"""
 
     progress = Signal(str, bool)  # (消息, 是否完成)
 
     def __init__(
         self,
         engine: DataManagerEngine,
-        folder: str,
-        interval: Interval,
+        file_list: list[TdxFileInfo],
         parent=None
     ) -> None:
         super().__init__(parent)
         self.engine = engine
-        self.folder = folder
-        self.interval = interval
+        self.file_list = file_list
 
     def run(self) -> None:
-        self.engine.import_tdx_folder(
-            self.folder, self.interval, self.progress.emit
-        )
+        total = len(self.file_list)
+        count = 0
+
+        for i, file_info in enumerate(self.file_list, 1):
+            self.progress.emit(
+                f"({i}/{total}) 正在导入: {file_info.vt_symbol}", False
+            )
+
+            try:
+                bars = TdxService.read_bars(file_info)
+                if bars:
+                    self.engine.database.save_bar_data(bars)
+                    count += 1
+            except Exception as e:
+                self.progress.emit(
+                    f"导入 {file_info.vt_symbol} 失败: {e}", False
+                )
+
+        self.progress.emit(f"导入完成，共导入 {count} 个合约", True)
 
 
 class AkShareImportThread(QThread):
@@ -98,20 +114,234 @@ class AkShareImportThread(QThread):
 # 子对话框
 # ────────────────────────────────────────────────────────────
 
+class TdxDiscoverThread(QThread):
+    """通达信目录扫描线程"""
+
+    finished = Signal(list)  # list[TdxFileInfo]
+
+    def __init__(self, tdx_path: str, parent=None) -> None:
+        super().__init__(parent)
+        self.tdx_path = tdx_path
+
+    def run(self) -> None:
+        result = TdxService.discover(self.tdx_path)
+        self.finished.emit(result)
+
+
+class TdxImportDialog(ThemedDialog):
+    """通达信本地数据导入对话框"""
+
+    def __init__(
+        self,
+        tdx_path: str,
+        parent=None
+    ) -> None:
+        super().__init__(parent)
+        self.file_list: list[TdxFileInfo] = []
+        self._visible_indices: list[int] = []
+
+        self.widget.setMinimumWidth(600)
+
+        # 标题
+        self.viewLayout.addWidget(SubtitleLabel("通达信本地数据导入", self))
+
+        # 过滤行
+        filter_row = QHBoxLayout()
+        self._filter_daily = CheckBox("日线")
+        self._filter_minute = CheckBox("分钟线")
+        self._filter_continuous = CheckBox("主力/指数")
+        self._filter_daily.setChecked(True)
+        self._filter_minute.setChecked(True)
+        self._filter_continuous.setChecked(True)
+        self._filter_daily.stateChanged.connect(self._apply_filter)
+        self._filter_minute.stateChanged.connect(self._apply_filter)
+        self._filter_continuous.stateChanged.connect(self._apply_filter)
+        filter_row.addWidget(self._filter_daily)
+        filter_row.addWidget(self._filter_minute)
+        filter_row.addWidget(self._filter_continuous)
+        filter_row.addStretch(1)
+        self.viewLayout.addLayout(filter_row)
+
+        # 扫描提示
+        self._scan_bar = InfoBar(
+            icon=InfoBarIcon.INFORMATION,
+            title="扫描中",
+            content="正在扫描通达信目录...",
+            orient=Qt.Horizontal,
+            isClosable=False,
+            duration=-1,
+            parent=self,
+        )
+        self._progress_bar = IndeterminateProgressBar(self)
+        self._progress_bar.start()
+        self.viewLayout.addWidget(self._scan_bar)
+        self.viewLayout.addWidget(self._progress_bar)
+
+        # 数据表格
+        self.table = TableWidget(self)
+        self._checkboxes: list[CheckBox] = []
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels([
+            "", "合约代码", "品种名", "周期", "数据量"
+        ])
+        self.table.setBorderVisible(False)
+        self.table.setEditTriggers(TableWidget.EditTrigger.NoEditTriggers)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.table.setColumnWidth(0, 40)
+        # 代码和品种名按比例拉伸，周期和数据量固定宽度
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.table.setColumnWidth(3, 80)
+        self.table.setColumnWidth(4, 80)
+        self.table.hide()
+        self.viewLayout.addWidget(self.table)
+
+        # 全选/反选按钮
+        btn_row = QHBoxLayout()
+        select_all_btn = PushButton("全选", self)
+        select_all_btn.setFixedHeight(30)
+        select_all_btn.clicked.connect(self._select_all)
+        invert_btn = PushButton("反选", self)
+        invert_btn.setFixedHeight(30)
+        invert_btn.clicked.connect(self._invert_selection)
+        btn_row.addWidget(select_all_btn)
+        btn_row.addWidget(invert_btn)
+        btn_row.addStretch(1)
+        self.viewLayout.addLayout(btn_row)
+
+        self.yesButton.setText("导入")
+        self.yesButton.setEnabled(False)
+        self.cancelButton.setText("取消")
+
+        # 启动扫描
+        self._scan_thread = TdxDiscoverThread(tdx_path, self)
+        self._scan_thread.finished.connect(self._on_scan_finished)
+        self._scan_thread.start()
+
+    def _on_scan_finished(self, file_list: list[TdxFileInfo]) -> None:
+        """扫描完成回调"""
+        self.file_list = file_list
+        self._scan_bar.hide()
+        self._progress_bar.stop()
+        self._progress_bar.hide()
+
+        if not file_list:
+            self._empty_bar = InfoBar(
+                icon=InfoBarIcon.WARNING,
+                title="未发现数据",
+                content="通达信目录下未发现期货数据文件",
+                orient=Qt.Horizontal,
+                isClosable=False,
+                duration=-1,
+                parent=self,
+            )
+            self.viewLayout.addWidget(self._empty_bar)
+            return
+
+        self.table.show()
+        self.yesButton.setEnabled(True)
+        self._fill_table()
+
+    def _apply_filter(self) -> None:
+        """根据过滤条件重新填充表格"""
+        self._fill_table()
+
+    def _fill_table(self) -> None:
+        """按过滤条件填充数据表格"""
+        interval_names = {
+            Interval.MINUTE: "1分钟",
+            Interval.DAILY: "日线",
+        }
+
+        show_daily = self._filter_daily.isChecked()
+        show_minute = self._filter_minute.isChecked()
+        show_continuous = self._filter_continuous.isChecked()
+
+        # 筛选可见项
+        self._visible_indices.clear()
+        for i, info in enumerate(self.file_list):
+            if info.is_continuous and not show_continuous:
+                continue
+            if info.interval == Interval.DAILY and not show_daily:
+                continue
+            if info.interval == Interval.MINUTE and not show_minute:
+                continue
+            self._visible_indices.append(i)
+
+        self.table.setRowCount(len(self._visible_indices))
+        self._checkboxes.clear()
+
+        for row, idx in enumerate(self._visible_indices):
+            info = self.file_list[idx]
+
+            cb = CheckBox()
+            cb.setChecked(True)
+            self._checkboxes.append(cb)
+            self.table.setCellWidget(row, 0, cb)
+
+            symbol_item = QTableWidgetItem(info.vt_symbol)
+            symbol_item.setTextAlignment(Qt.AlignCenter)
+            self.table.setItem(row, 1, symbol_item)
+
+            name_item = QTableWidgetItem(info.name)
+            name_item.setTextAlignment(Qt.AlignCenter)
+            self.table.setItem(row, 2, name_item)
+
+            interval_name = interval_names.get(
+                info.interval, info.interval.value
+            )
+            interval_item = QTableWidgetItem(interval_name)
+            interval_item.setTextAlignment(Qt.AlignCenter)
+            self.table.setItem(row, 3, interval_item)
+
+            count_item = QTableWidgetItem(str(info.bar_count))
+            count_item.setTextAlignment(Qt.AlignCenter)
+            self.table.setItem(row, 4, count_item)
+
+    def _select_all(self) -> None:
+        """全选"""
+        for cb in self._checkboxes:
+            cb.setChecked(True)
+
+    def _invert_selection(self) -> None:
+        """反选"""
+        for cb in self._checkboxes:
+            cb.setChecked(not cb.isChecked())
+
+    def get_selected(self) -> list[TdxFileInfo]:
+        """获取勾选的文件列表"""
+        return [
+            self.file_list[idx]
+            for idx, cb in zip(self._visible_indices, self._checkboxes)
+            if cb.isChecked()
+        ]
+
+
 class DateRangeDialog(ThemedDialog):
     """日期范围选择对话框"""
 
     def __init__(self, start: datetime, end: datetime, parent=None) -> None:
         super().__init__(parent)
 
+        # 默认区间：最近一个月
+        now = datetime.now()
+        one_month_ago = now - timedelta(days=30)
+
         self.viewLayout.addWidget(SubtitleLabel("选择数据区间", self))
 
         self.start_edit = DateEdit(self)
-        self.start_edit.setDate(QDate(start.year, start.month, start.day))
+        self.start_edit.setDate(QDate(
+            one_month_ago.year, one_month_ago.month, one_month_ago.day
+        ))
+        self.start_edit.setDisplayFormat("yyyy年MM月dd日")
         self.viewLayout.addWidget(self.start_edit)
 
         self.end_edit = DateEdit(self)
-        self.end_edit.setDate(QDate(end.year, end.month, end.day))
+        self.end_edit.setDate(QDate(now.year, now.month, now.day))
+        self.end_edit.setDisplayFormat("yyyy年MM月dd日")
         self.viewLayout.addWidget(self.end_edit)
 
         self.yesButton.setText("确定")
@@ -135,7 +365,7 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
         super().__init__(parent=parent)
 
         self.engine = DataManagerEngine()
-        self._import_thread: TdxImportThread | AkShareImportThread | None = None
+        self._import_thread: TdxLocalImportThread | AkShareImportThread | None = None
         self._state_tooltip: StateToolTip | None = None
         self._loaded = False
 
@@ -166,9 +396,8 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
         )
         import_menu = RoundMenu(parent=toolbar)
         tdx_menu = RoundMenu("通达信", toolbar)
-        self._import_daily_action = Action(FluentIcon.DATE_TIME, "日线数据")
-        self._import_minute_action = Action(FluentIcon.DATE_TIME, "分钟数据")
-        tdx_menu.addActions([self._import_daily_action, self._import_minute_action])
+        self._import_tdx_local_action = Action(FluentIcon.FOLDER, "本地数据")
+        tdx_menu.addAction(self._import_tdx_local_action)
         import_menu.addMenu(tdx_menu)
 
         akshare_menu = RoundMenu("AKShare", toolbar)
@@ -187,12 +416,7 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
 
         self.import_button.setMenu(import_menu)
 
-        self._import_daily_action.triggered.connect(
-            lambda: self._import_tdx(Interval.DAILY)
-        )
-        self._import_minute_action.triggered.connect(
-            lambda: self._import_tdx(Interval.MINUTE)
-        )
+        self._import_tdx_local_action.triggered.connect(self._import_tdx_local)
         self._import_akshare_all_action.triggered.connect(
             lambda: self._import_akshare(None)
         )
@@ -541,24 +765,47 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
 
     # ── 通达信导入 ──────────────────────────────────────────
 
-    def _import_tdx(self, interval: Interval) -> None:
-        """通达信数据导入"""
-        folder = QFileDialog.getExistingDirectory(
-            self.window(), "选择通达信导出文件夹"
-        )
-        if not folder:
+    def _import_tdx_local(self) -> None:
+        """通达信本地二进制数据导入"""
+        from guanlan.ui.common.config import cfg
+
+        tdx_path = cfg.get(cfg.tdxPath)
+        if not tdx_path:
+            InfoBar.warning(
+                title="未配置路径",
+                content="请先在「设置 → 数据 → 通达信目录」中配置路径",
+                position=InfoBarPosition.TOP,
+                duration=4000, parent=self
+            )
             return
 
+        dialog = TdxImportDialog(tdx_path, self.window())
+        if not dialog.exec():
+            return
+
+        selected = dialog.get_selected()
+        if not selected:
+            InfoBar.info(
+                title="提示", content="未选择任何合约",
+                position=InfoBarPosition.TOP,
+                duration=3000, parent=self
+            )
+            return
+
+        self._start_tdx_local_import(selected)
+
+    def _start_tdx_local_import(self, file_list: list[TdxFileInfo]) -> None:
+        """启动本地数据导入线程"""
         self.import_button.setEnabled(False)
 
         self._state_tooltip = StateToolTip(
-            "数据导入", "正在导入通达信数据，请稍候", self.window()
+            "数据导入", "正在导入通达信本地数据，请稍候", self.window()
         )
         self._state_tooltip.move(self._state_tooltip.getSuitablePos())
         self._state_tooltip.show()
 
-        self._import_thread = TdxImportThread(
-            self.engine, folder, interval, self
+        self._import_thread = TdxLocalImportThread(
+            self.engine, file_list, self
         )
         self._import_thread.progress.connect(self._on_import_progress)
         self._import_thread.finished.connect(self._on_import_thread_finished)

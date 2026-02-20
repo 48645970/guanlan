@@ -55,7 +55,9 @@ from .indicator_panel import IndicatorFlyoutView
 logger = get_logger(__name__)
 
 # 历史加载根数预设
-HISTORY_BAR_COUNTS: list[str] = ["0", "100", "200", "500", "1000"]
+HISTORY_BAR_COUNTS: list[str] = [
+    "0", "100", "200", "500", "1000", "2000", "5000", "10000", "全部"
+]
 DEFAULT_BAR_COUNT: str = "200"
 
 # Tick 节流间隔（毫秒）：限制图表刷新频率，避免 JS 队列堆积
@@ -910,6 +912,16 @@ class ChartWindow(WebEngineFluentWidget):
         if self._bar_count == 0:
             return False
 
+        # 大量数据加载提示
+        if self._bar_count >= 5000 or self._bar_count == -1:
+            label = "全部" if self._bar_count == -1 else str(self._bar_count)
+            InfoBar.info(
+                title="加载中",
+                content=f"正在加载 {label} 条历史数据，请稍候...",
+                parent=self, duration=2000,
+                position=InfoBarPosition.TOP,
+            )
+
         bar_dicts = self._data_loader.load(
             self._vt_symbol, self._period, self._bar_count,
         )
@@ -1183,10 +1195,13 @@ class ChartWindow(WebEngineFluentWidget):
     def _on_bar_count_changed(self) -> None:
         """历史条数变更时触发"""
         text = self._bar_count_combo.currentText()
-        try:
-            count = int(text)
-        except ValueError:
-            return
+        if text == "全部":
+            count = -1
+        else:
+            try:
+                count = int(text)
+            except ValueError:
+                return
         if count == self._bar_count:
             return
 
@@ -1231,14 +1246,18 @@ class ChartWindow(WebEngineFluentWidget):
             self._period_unit_combo.blockSignals(False)
 
         # 恢复历史条数
-        saved_count = str(self._settings.get("bar_count", DEFAULT_BAR_COUNT))
+        saved_count = self._settings.get("bar_count", DEFAULT_BAR_COUNT)
+        display_text = "全部" if saved_count == -1 else str(saved_count)
         self._bar_count_combo.blockSignals(True)
-        self._bar_count_combo.setCurrentText(saved_count)
+        self._bar_count_combo.setCurrentText(display_text)
         self._bar_count_combo.blockSignals(False)
-        try:
-            self._bar_count = int(saved_count)
-        except ValueError:
-            self._bar_count = int(DEFAULT_BAR_COUNT)
+        if saved_count == -1:
+            self._bar_count = -1
+        else:
+            try:
+                self._bar_count = int(saved_count)
+            except (ValueError, TypeError):
+                self._bar_count = int(DEFAULT_BAR_COUNT)
 
     def _save_settings(self) -> None:
         """保存品种的周期、条数和指标参数"""

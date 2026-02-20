@@ -8,21 +8,16 @@ Author: 海山观澜
 """
 
 import csv
-import os
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from vnpy.trader.constant import Interval, Exchange
 from vnpy.trader.object import BarData, HistoryRequest
 from vnpy.trader.database import BarOverview
-from vnpy.trader.utility import ZoneInfo
 
 from guanlan.core.trader.database import ArcticDBDatabase
 from guanlan.core.setting.contract import load_contracts, load_favorites
 from guanlan.core.utils.symbol_converter import SymbolConverter
-
-# 上海时区
-CHINA_TZ = ZoneInfo("Asia/Shanghai")
 
 
 class DataManagerEngine:
@@ -103,142 +98,6 @@ class DataManagerEngine:
             return True
         except PermissionError:
             return False
-
-    def import_tdx_folder(
-        self,
-        folder: str,
-        interval: Interval,
-        callback: Callable[[str, bool], None] | None = None
-    ) -> int:
-        """从通达信导出文件夹批量导入
-
-        Parameters
-        ----------
-        folder : str
-            通达信导出文件夹路径
-        interval : Interval
-            数据周期
-        callback : Callable[[str, bool], None] | None
-            进度回调，参数为 (消息, 是否完成)
-        """
-        contracts = load_contracts()
-        count = 0
-
-        file_list = os.listdir(folder)
-        for filename in file_list:
-            parts = filename.split(".")
-            if len(parts) != 2 or parts[1] != "txt":
-                continue
-
-            file_path = os.path.join(folder, filename)
-            csv_file = os.path.join(folder, f"{parts[0]}.csv")
-
-            # 已转换过的跳过
-            if os.path.exists(csv_file):
-                continue
-
-            # 解析通达信文件
-            with open(file_path, "r", encoding="gb2312") as f:
-                lines = f.readlines()
-
-            if len(lines) < 3:
-                continue
-
-            # 取代码
-            symbol_list = lines[0].split()
-            symbol = symbol_key = symbol_list[0]
-
-            # 通达信指数合约处理
-            if symbol.endswith("L9"):
-                symbol_key = symbol[:-2]
-                symbol = symbol_key + "9999"
-            elif symbol.endswith("L8"):
-                symbol_key = symbol[:-2]
-                symbol = symbol_key + "8888"
-
-            # 提取品种代码查找合约信息
-            commodity = SymbolConverter.extract_commodity(symbol_key)
-
-            if commodity not in contracts:
-                continue
-
-            contract_info = contracts[commodity]
-            exchange = Exchange(contract_info["exchange"])
-
-            # 生成符合交易所规则的代码
-            vt_symbol = SymbolConverter.to_exchange(symbol, exchange)
-
-            # 转换文件格式
-            lines[1] = ",".join(lines[1].split()) + "\n"
-            lines = lines[1:-1]
-
-            with open(csv_file, "w", encoding="gb2312") as f:
-                f.writelines(lines)
-
-            if len(lines) <= 1:
-                continue
-
-            if callback:
-                callback(f"正在导入: {vt_symbol}.{exchange.value}", False)
-
-            self._import_tdx_csv(csv_file, exchange, vt_symbol, interval)
-            count += 1
-
-        if callback:
-            callback(f"数据导入完成，共导入 {count} 个合约", True)
-
-        return count
-
-    def _import_tdx_csv(
-        self,
-        file_path: str,
-        exchange: Exchange,
-        symbol: str,
-        interval: Interval
-    ) -> None:
-        """导入单个通达信 CSV 文件"""
-        with open(file_path, "r", encoding="gb2312") as f:
-            buf = [line.replace("\0", "") for line in f]
-
-        reader = csv.DictReader(buf, delimiter=",")
-        bars: list[BarData] = []
-
-        for item in reader:
-            if interval == Interval.MINUTE:
-                time_str = item["时间"]
-                hour = time_str[0:2]
-                minute = time_str[2:4]
-
-                dt = datetime.strptime(
-                    f"{item['日期']} {hour}:{minute}", "%Y/%m/%d %H:%M"
-                )
-                dt = dt + timedelta(minutes=-1)
-
-                if dt.hour > 15:
-                    dt = dt + timedelta(days=-1)
-
-                dt = dt.replace(tzinfo=CHINA_TZ)
-            else:
-                dt = datetime.strptime(item["日期"], "%Y/%m/%d")
-
-            bar = BarData(
-                symbol=symbol,
-                exchange=exchange,
-                interval=interval,
-                datetime=dt,
-                open_price=float(item["开盘"]),
-                high_price=float(item["最高"]),
-                low_price=float(item["最低"]),
-                close_price=float(item["收盘"]),
-                volume=float(item["成交量"]),
-                turnover=float(item.get("结算价", 0)),
-                open_interest=float(item.get("持仓量", 0)),
-                gateway_name="TDX",
-            )
-            bars.append(bar)
-
-        if bars:
-            self.database.save_bar_data(bars)
 
     def download_bar_data(
         self,

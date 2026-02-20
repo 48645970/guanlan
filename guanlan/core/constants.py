@@ -14,13 +14,15 @@ Author: 海山观澜
 from enum import Enum
 from pathlib import Path
 
+from vnpy.trader.utility import ZoneInfo
+
 # ============================================================================
 # 应用元数据
 # ============================================================================
 
 APP_NAME = "观澜量化"
 APP_NAME_EN = "Guanlan Quant"
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"
 APP_AUTHOR = "海山观澜"
 APP_YEAR = "2024-2030"
 
@@ -47,6 +49,9 @@ DATA_DIR = PROJECT_ROOT / "data"
 
 # 配置目录
 CONFIG_DIR = PROJECT_ROOT / ".guanlan"
+
+# 上海时区
+CHINA_TZ = ZoneInfo("Asia/Shanghai")
 
 # ArcticDB 数据目录
 ARCTIC_DATA_DIR = CONFIG_DIR / "data" / "arctic"

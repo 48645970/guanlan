@@ -10,10 +10,12 @@ from PySide6.QtWidgets import QWidget, QLabel
 
 from logging import DEBUG, INFO, WARNING, ERROR
 
+from PySide6.QtWidgets import QFileDialog
+
 from qfluentwidgets import (
     SettingCardGroup, SwitchSettingCard, OptionsSettingCard,
     HyperlinkCard, ScrollArea, ExpandLayout, CustomColorSettingCard,
-    setTheme, setThemeColor, InfoBar, SettingCard,
+    setTheme, setThemeColor, InfoBar, SettingCard, PushSettingCard,
     ExpandGroupSettingCard, SwitchButton, ComboBox,
     LineEdit, PasswordLineEdit, SpinBox
 )
@@ -103,6 +105,17 @@ class SettingInterface(ThemeMixin, ScrollArea):
             "连接行情后自动开始记录收藏品种的实时行情",
             cfg.autoDataRecording,
             self.auto_task_group
+        )
+
+        # 数据设置组
+        self.data_group = SettingCardGroup("数据", self.scroll_widget)
+
+        self.tdx_path_card = PushSettingCard(
+            "选择目录",
+            FIF.FOLDER,
+            "通达信目录",
+            cfg.get(cfg.tdxPath) or "未设置",
+            self.data_group
         )
 
         # 交易设置组
@@ -359,6 +372,9 @@ class SettingInterface(ThemeMixin, ScrollArea):
         self.personal_group.addSettingCard(self.theme_color_card)
         self.personal_group.addSettingCard(self.zoom_card)
 
+        # 数据组
+        self.data_group.addSettingCard(self.tdx_path_card)
+
         self.about_group.addSettingCard(self.disclaimer_card)
         self.about_group.addSettingCard(self.vnpy_card)
         self.about_group.addSettingCard(self.about_card)
@@ -377,6 +393,7 @@ class SettingInterface(ThemeMixin, ScrollArea):
         self.expand_layout.setSpacing(28)
         self.expand_layout.setContentsMargins(36, 10, 36, 0)
         self.expand_layout.addWidget(self.personal_group)
+        self.expand_layout.addWidget(self.data_group)
         self.expand_layout.addWidget(self.auto_task_group)
         self.expand_layout.addWidget(self.trading_group)
         self.expand_layout.addWidget(self.about_group)
@@ -391,9 +408,23 @@ class SettingInterface(ThemeMixin, ScrollArea):
             parent=self
         )
 
+    def _on_tdx_path_clicked(self) -> None:
+        """选择通达信目录"""
+        folder = QFileDialog.getExistingDirectory(
+            self, "选择通达信安装目录", cfg.get(cfg.tdxPath)
+        )
+        if not folder:
+            return
+
+        cfg.set(cfg.tdxPath, folder)
+        self.tdx_path_card.setContent(folder)
+
     def _connect_signal_to_slot(self):
         """连接信号到槽函数"""
         cfg.appRestartSig.connect(self._show_restart_tooltip)
+
+        # 数据
+        self.tdx_path_card.clicked.connect(self._on_tdx_path_clicked)
 
         # 个性化
         cfg.themeChanged.connect(setTheme)
