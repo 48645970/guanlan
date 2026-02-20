@@ -20,7 +20,7 @@ from pathlib import Path
 
 APP_NAME = "观澜量化"
 APP_NAME_EN = "Guanlan Quant"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.2.0"
 APP_AUTHOR = "海山观澜"
 APP_YEAR = "2024-2030"
 

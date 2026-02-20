@@ -58,6 +58,7 @@ class SignalBus(QObject):
 
     # ==================== 合约管理信号 ====================
     contract_auto_refresh = Signal()             # 自动刷新主力合约
+    data_auto_download = Signal()                # 自动下载历史数据
     symbol_subscribe = Signal(str)               # 订阅行情
     symbol_unsubscribe = Signal(str)             # 取消订阅
 

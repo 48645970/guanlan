@@ -7,7 +7,7 @@ Author: 海山观澜
 
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal, QObject, QModelIndex
+from PySide6.QtCore import Qt, Signal, QModelIndex, QThread
 from PySide6.QtGui import QColor, QPainter, QPalette
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
@@ -215,9 +215,16 @@ class ContractTable(TableWidget):
             )
 
 
-class _RefreshSignal(QObject):
-    """线程安全的刷新完成信号"""
+class _RefreshThread(QThread):
+    """主力合约刷新工作线程"""
     finished = Signal(int, int)
+
+    def __init__(self, contracts: dict[str, dict[str, Any]], parent=None):
+        super().__init__(parent)
+        self.contracts = contracts
+
+    def run(self) -> None:
+        refresh_all(self.contracts, self.finished.emit)
 
 
 class ContractInterface(ThemeMixin, ScrollArea):
@@ -229,10 +236,7 @@ class ContractInterface(ThemeMixin, ScrollArea):
         self.view = QWidget(self)
         self.main_layout = QVBoxLayout(self.view)
         self.state_tooltip: StateToolTip | None = None
-
-        # 线程安全信号
-        self._refresh_signal = _RefreshSignal(self)
-        self._refresh_signal.finished.connect(self._on_refresh_complete)
+        self._refresh_thread: _RefreshThread | None = None
 
         self._init_toolbar()
         self._init_table()
@@ -281,7 +285,7 @@ class ContractInterface(ThemeMixin, ScrollArea):
 
         # 副标题
         self.subtitle_label = CaptionLabel(
-            "交易日08:55自动刷新，也可点击手动刷新主力合约", toolbar
+            "交易日20:00自动刷新，也可点击手动刷新主力合约", toolbar
         )
 
         layout.addLayout(title_row)
@@ -370,7 +374,9 @@ class ContractInterface(ThemeMixin, ScrollArea):
         self.state_tooltip.move(self.state_tooltip.getSuitablePos())
         self.state_tooltip.show()
 
-        refresh_all(self.table.contracts, self._refresh_signal.finished.emit)
+        self._refresh_thread = _RefreshThread(self.table.contracts, self)
+        self._refresh_thread.finished.connect(self._on_refresh_complete)
+        self._refresh_thread.start()
 
     def _on_refresh_complete(self, total: int, errors: int) -> None:
         """刷新完成回调"""

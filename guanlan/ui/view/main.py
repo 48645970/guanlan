@@ -309,11 +309,11 @@ class MainWindow(FluentWindow):
 
     _BJT = timezone(timedelta(hours=8))
 
-    # 主力合约自动刷新时间
-    _CONTRACT_REFRESH_TIME: tuple[int, int] = (8, 55)
+    # 每日定时任务时间（北京时间 20:00）
+    _DAILY_TASK_TIME: tuple[int, int] = (20, 0)
 
     def _update_clock(self) -> None:
-        """更新标题栏时钟（北京时间）+ 交易时段提醒 + 主力合约自动刷新"""
+        """更新标题栏时钟（北京时间）+ 交易时段提醒 + 每日定时任务"""
         now = datetime.now(self._BJT)
         weekday = self._WEEKDAYS[now.weekday()]
         self._clock_label.setText(f"{now:%Y-%m-%d %H:%M:%S} {weekday}")
@@ -321,15 +321,18 @@ class MainWindow(FluentWindow):
         from guanlan.core.services.alert import futures
         futures.check(now.time())
 
-        # 每个交易日 08:55 自动刷新主力合约
+        # 每个交易日 20:00 自动刷新主力合约 + 下载历史数据
         key = (now.hour, now.minute)
         today = now.date()
-        if (key == self._CONTRACT_REFRESH_TIME
-                and getattr(self, "_contract_refresh_date", None) != today):
+        if (key == self._DAILY_TASK_TIME
+                and getattr(self, "_daily_task_date", None) != today):
             from guanlan.core.services.calendar import is_trading_day
             if is_trading_day(today):
-                self._contract_refresh_date = today
-                signal_bus.contract_auto_refresh.emit()
+                self._daily_task_date = today
+                if cfg.get(cfg.autoUpdateContract):
+                    signal_bus.contract_auto_refresh.emit()
+                if cfg.get(cfg.autoDownloadData):
+                    signal_bus.data_auto_download.emit()
 
     def _update_market_status(self) -> None:
         """更新标题栏行情连接状态指示器"""

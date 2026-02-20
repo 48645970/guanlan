@@ -78,6 +78,33 @@ class SettingInterface(ThemeMixin, ScrollArea):
             parent=self.personal_group
         )
 
+        # 自动任务设置组
+        self.auto_task_group = SettingCardGroup("自动任务", self.scroll_widget)
+
+        self.auto_contract_card = SwitchSettingCard(
+            FIF.SYNC,
+            "自动更新合约",
+            "交易日20:00自动刷新主力合约信息",
+            cfg.autoUpdateContract,
+            self.auto_task_group
+        )
+
+        self.auto_download_card = SwitchSettingCard(
+            FIF.DOWNLOAD,
+            "自动下载行情数据",
+            "交易日20:00自动下载收藏品种的历史行情数据",
+            cfg.autoDownloadData,
+            self.auto_task_group
+        )
+
+        self.auto_recording_card = SwitchSettingCard(
+            FIF.ALBUM,
+            "自动行情记录",
+            "连接行情后自动开始记录收藏品种的实时行情",
+            cfg.autoDataRecording,
+            self.auto_task_group
+        )
+
         # 交易设置组
         self.trading_group = SettingCardGroup("交易", self.scroll_widget)
 
@@ -226,15 +253,6 @@ class SettingInterface(ThemeMixin, ScrollArea):
         )
         self.db_card.addGroup(FIF.LABEL, "数据库名称", "", le_name)
 
-        # 时区
-        le_tz = LineEdit(self)
-        le_tz.setText(cfg.get(cfg.databaseTimezone))
-        le_tz.setMinimumWidth(600)
-        le_tz.editingFinished.connect(
-            lambda: cfg.set(cfg.databaseTimezone, le_tz.text())
-        )
-        self.db_card.addGroup(FIF.DATE_TIME, "时区", "", le_tz)
-
         # 服务器地址
         le_host = LineEdit(self)
         le_host.setText(cfg.get(cfg.databaseHost))
@@ -278,19 +296,9 @@ class SettingInterface(ThemeMixin, ScrollArea):
     def _localize_widgets(self) -> None:
         """汉化组件内部英文文本"""
         # SwitchSettingCard: Off/On → 关/开
-        switch = self.mica_card.switchButton
-        switch._offText = "关"
-        switch._onText = "开"
-        switch.setText("开" if switch.isChecked() else "关")
-
-        # 重写 setValue 使切换时也显示中文
-        _original_set_value = self.mica_card.setValue
-
-        def _set_value_zh(isChecked: bool) -> None:
-            _original_set_value(isChecked)
-            switch.setText("开" if isChecked else "关")
-
-        self.mica_card.setValue = _set_value_zh
+        for card in (self.mica_card, self.auto_contract_card,
+                     self.auto_download_card, self.auto_recording_card):
+            self._localize_switch_card(card)
 
         # CustomColorSettingCard: Default color/Custom color/Choose color
         self.theme_color_card.defaultRadioButton.setText("默认颜色")
@@ -301,6 +309,22 @@ class SettingInterface(ThemeMixin, ScrollArea):
             self.theme_color_card.buttonGroup.checkedButton().text()
         )
         self.theme_color_card.choiceLabel.adjustSize()
+
+    @staticmethod
+    def _localize_switch_card(card: SwitchSettingCard) -> None:
+        """汉化 SwitchSettingCard 的开/关文本"""
+        switch = card.switchButton
+        switch._offText = "关"
+        switch._onText = "开"
+        switch.setText("开" if switch.isChecked() else "关")
+
+        _original_set_value = card.setValue
+
+        def _set_value_zh(isChecked: bool) -> None:
+            _original_set_value(isChecked)
+            switch.setText("开" if isChecked else "关")
+
+        card.setValue = _set_value_zh
 
     def _init_widget(self):
         """初始化组件"""
@@ -339,14 +363,21 @@ class SettingInterface(ThemeMixin, ScrollArea):
         self.about_group.addSettingCard(self.vnpy_card)
         self.about_group.addSettingCard(self.about_card)
 
-        # 添加组到布局
-        self.expand_layout.setSpacing(28)
-        self.expand_layout.setContentsMargins(36, 10, 36, 0)
+        # 自动任务组
+        self.auto_task_group.addSettingCard(self.auto_contract_card)
+        self.auto_task_group.addSettingCard(self.auto_download_card)
+        self.auto_task_group.addSettingCard(self.auto_recording_card)
+
+        # 交易组
         self.trading_group.addSettingCard(self.log_card)
         self.trading_group.addSettingCard(self.dingtalk_card)
         self.trading_group.addSettingCard(self.db_card)
 
+        # 添加组到布局
+        self.expand_layout.setSpacing(28)
+        self.expand_layout.setContentsMargins(36, 10, 36, 0)
         self.expand_layout.addWidget(self.personal_group)
+        self.expand_layout.addWidget(self.auto_task_group)
         self.expand_layout.addWidget(self.trading_group)
         self.expand_layout.addWidget(self.about_group)
 

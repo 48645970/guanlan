@@ -30,6 +30,7 @@ from guanlan.ui.common.mixin import ThemeMixin
 from guanlan.ui.widgets import ThemedDialog
 from guanlan.core.trader.data import DataManagerEngine
 from guanlan.core.constants import Interval, Exchange
+from guanlan.core.events.signal_bus import signal_bus
 from guanlan.core.setting.contract import load_contracts
 from guanlan.core.utils.symbol_converter import SymbolConverter
 
@@ -66,6 +67,31 @@ class TdxImportThread(QThread):
         self.engine.import_tdx_folder(
             self.folder, self.interval, self.progress.emit
         )
+
+
+class AkShareImportThread(QThread):
+    """AKShare 数据导入工作线程"""
+
+    progress = Signal(str, bool)  # (消息, 是否完成)
+
+    def __init__(
+        self,
+        engine: DataManagerEngine,
+        interval: Interval | None = None,
+        parent=None
+    ) -> None:
+        super().__init__(parent)
+        self.engine = engine
+        self.interval = interval
+
+    def run(self) -> None:
+        if self.interval is None:
+            # 一键下载全周期
+            self.engine.download_akshare_all(self.progress.emit)
+        else:
+            self.engine.download_akshare_favorites(
+                self.interval, self.progress.emit
+            )
 
 
 # ────────────────────────────────────────────────────────────
@@ -109,7 +135,7 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
         super().__init__(parent=parent)
 
         self.engine = DataManagerEngine()
-        self._import_thread: TdxImportThread | None = None
+        self._import_thread: TdxImportThread | AkShareImportThread | None = None
         self._state_tooltip: StateToolTip | None = None
         self._loaded = False
 
@@ -144,6 +170,21 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
         self._import_minute_action = Action(FluentIcon.DATE_TIME, "分钟数据")
         tdx_menu.addActions([self._import_daily_action, self._import_minute_action])
         import_menu.addMenu(tdx_menu)
+
+        akshare_menu = RoundMenu("AKShare", toolbar)
+        self._import_akshare_all_action = Action(FluentIcon.SYNC, "一键下载（收藏品种）")
+        akshare_menu.addAction(self._import_akshare_all_action)
+        akshare_menu.addSeparator()
+        self._import_akshare_daily_action = Action(FluentIcon.DOWNLOAD, "日线数据")
+        self._import_akshare_hour_action = Action(FluentIcon.DOWNLOAD, "小时数据")
+        self._import_akshare_minute_action = Action(FluentIcon.DOWNLOAD, "1分钟数据")
+        akshare_menu.addActions([
+            self._import_akshare_daily_action,
+            self._import_akshare_hour_action,
+            self._import_akshare_minute_action,
+        ])
+        import_menu.addMenu(akshare_menu)
+
         self.import_button.setMenu(import_menu)
 
         self._import_daily_action.triggered.connect(
@@ -151,6 +192,18 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
         )
         self._import_minute_action.triggered.connect(
             lambda: self._import_tdx(Interval.MINUTE)
+        )
+        self._import_akshare_all_action.triggered.connect(
+            lambda: self._import_akshare(None)
+        )
+        self._import_akshare_daily_action.triggered.connect(
+            lambda: self._import_akshare(Interval.DAILY)
+        )
+        self._import_akshare_hour_action.triggered.connect(
+            lambda: self._import_akshare(Interval.HOUR)
+        )
+        self._import_akshare_minute_action.triggered.connect(
+            lambda: self._import_akshare(Interval.MINUTE)
         )
 
         # 刷新按钮
@@ -168,7 +221,7 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
 
         # 副标题
         self.subtitle_label = CaptionLabel(
-            "管理本地历史数据，支持导入和导出操作", toolbar
+            "管理本地历史数据，交易日20:00自动下载收藏品种数据", toolbar
         )
 
         layout.addLayout(title_row)
@@ -237,6 +290,9 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
         self.main_layout.addWidget(self.table, 1)
 
         self._init_theme()
+
+        # 连接自动下载信号（每日 20:00 触发）
+        signal_bus.data_auto_download.connect(self._import_akshare)
 
     # ── 刷新树 ──────────────────────────────────────────────
 
@@ -314,7 +370,7 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
             delete_btn.setFixedSize(80, 30)
             delete_btn.clicked.connect(partial(
                 self._delete_data,
-                overview.symbol, overview.exchange, overview.interval
+                overview.symbol, overview.exchange, overview.interval, item
             ))
 
             for col in range(8, 11):
@@ -451,7 +507,8 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
         self,
         symbol: str,
         exchange: Exchange,
-        interval: Interval
+        interval: Interval,
+        item: QTreeWidgetItem
     ) -> None:
         """删除数据"""
         box = MessageBox(
@@ -465,6 +522,15 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
 
         count = self.engine.delete_bar_data(symbol, exchange, interval)
 
+        # 从树中移除节点，父节点无子节点时一并移除
+        parent = item.parent()
+        if parent:
+            parent.removeChild(item)
+            if parent.childCount() == 0:
+                grandparent = parent.parent()
+                if grandparent:
+                    grandparent.removeChild(parent)
+
         InfoBar.success(
             title="删除成功",
             content=f"已删除 {count} 条数据",
@@ -472,7 +538,6 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
             position=InfoBarPosition.TOP,
             duration=4000, parent=self
         )
-        self._refresh_tree()
 
     # ── 通达信导入 ──────────────────────────────────────────
 
@@ -494,6 +559,33 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
 
         self._import_thread = TdxImportThread(
             self.engine, folder, interval, self
+        )
+        self._import_thread.progress.connect(self._on_import_progress)
+        self._import_thread.finished.connect(self._on_import_thread_finished)
+        self._import_thread.start()
+
+    def _import_akshare(self, interval: Interval | None = None) -> None:
+        """AKShare 收藏品种数据导入
+
+        Parameters
+        ----------
+        interval : Interval | None
+            数据周期，None 表示一键下载全周期
+        """
+        if interval is None:
+            desc = "正在从 AKShare 一键下载收藏品种数据"
+        else:
+            interval_name = INTERVAL_NAME_MAP.get(interval, interval.value)
+            desc = f"正在从 AKShare 下载收藏品种{interval_name}数据"
+
+        self.import_button.setEnabled(False)
+
+        self._state_tooltip = StateToolTip("数据导入", desc, self.window())
+        self._state_tooltip.move(self._state_tooltip.getSuitablePos())
+        self._state_tooltip.show()
+
+        self._import_thread = AkShareImportThread(
+            self.engine, interval, self
         )
         self._import_thread.progress.connect(self._on_import_progress)
         self._import_thread.finished.connect(self._on_import_thread_finished)

@@ -311,8 +311,8 @@ class HomeInterface(ThemeMixin, QWidget):
 
         self.banner.add_link_card(
             FluentIcon.HELP,
-            "使用帮助",
-            "Help",
+            "作者专栏",
+            "Author",
             HELP_URL
         )
 

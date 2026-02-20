@@ -8,14 +8,11 @@
 Author: 海山观澜
 """
 
-import asyncio
-import json
-import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pandas as pd
 
-from PySide6.QtCore import Qt, Signal, QTimer, QThread
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
@@ -30,7 +27,7 @@ from qfluentwidgets import (
     qconfig,
 )
 
-from vnpy.trader.constant import Exchange, Interval, Direction, Offset
+from vnpy.trader.constant import Exchange, Direction, Offset
 from vnpy.trader.event import EVENT_TICK, EVENT_TRADE
 from vnpy.trader.object import TickData, BarData, TradeData
 
@@ -38,7 +35,6 @@ from lightweight_charts.widgets import QtChart
 
 from guanlan.core.constants import COLOR_UP, COLOR_DOWN, COLOR_UP_ALPHA, COLOR_DOWN_ALPHA
 from guanlan.core.trader.bar_generator import ChartBarGenerator
-from guanlan.core.trader.database import ArcticDBDatabase
 from guanlan.core.trader.event import Event, EventEngine
 from guanlan.core.setting import chart as chart_setting
 from guanlan.core.setting import chart_scheme
@@ -49,78 +45,21 @@ from guanlan.core.utils.symbol_converter import SymbolConverter
 from guanlan.ui.common.icon import get_icon_path
 from guanlan.ui.common.style import StyleSheet
 from guanlan.ui.widgets.window.webengine import WebEngineFluentWidget
+from guanlan.core.utils.logger import get_logger
 
+from .ai_analysis import AIAnalysisWorker
+from .data_loader import ChartDataLoader, bar_to_dict
 from .indicator import IndicatorManager
 from .indicator_panel import IndicatorFlyoutView
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
-# 历史加载根数
-HISTORY_BAR_COUNT = 200
+# 历史加载根数预设
+HISTORY_BAR_COUNTS: list[str] = ["0", "100", "200", "500", "1000"]
+DEFAULT_BAR_COUNT: str = "200"
 
 # Tick 节流间隔（毫秒）：限制图表刷新频率，避免 JS 队列堆积
 TICK_THROTTLE_MS = 100
-
-
-class _AIAnalysisWorker(QThread):
-    """AI 分析工作线程"""
-
-    analysis_finished = Signal(dict)
-    analysis_error = Signal(str)
-
-    def __init__(
-        self,
-        state: dict,
-        symbol: str,
-        current_price: float,
-        parent=None,
-    ) -> None:
-        super().__init__(parent)
-        self._state = state
-        self._symbol = symbol
-        self._current_price = current_price
-
-    def run(self) -> None:
-        loop = asyncio.new_event_loop()
-        try:
-            loop.run_until_complete(self._analyze())
-        finally:
-            loop.run_until_complete(loop.shutdown_asyncgens())
-            loop.close()
-
-    async def _analyze(self) -> None:
-        from guanlan.core.services.ai import get_ai_client
-        from guanlan.core.services.ai.prompts import (
-            CHART_ANALYSIS_SYSTEM,
-            format_chart_analysis_prompt,
-        )
-
-        try:
-            # 构建提示词
-            prompt = format_chart_analysis_prompt(
-                self._state,
-                self._symbol,
-                self._current_price,
-            )
-
-            # 调用 AI
-            ai = get_ai_client()
-            response = await ai.chat(
-                prompt,
-                system_prompt=CHART_ANALYSIS_SYSTEM,
-                model=None,  # 使用默认模型
-            )
-
-            # 解析 JSON
-            data = json.loads(response)
-            self.analysis_finished.emit(data)
-
-        except json.JSONDecodeError as e:
-            logger.error(f"AI 返回格式错误: {e}, response={response[:200]}")
-            self.analysis_error.emit("AI 返回格式错误，请检查日志")
-        except Exception as e:
-            logger.error(f"AI 分析失败: {e}")
-            self.analysis_error.emit(str(e))
 
 
 class ChartWindow(WebEngineFluentWidget):
@@ -148,6 +87,7 @@ class ChartWindow(WebEngineFluentWidget):
         self._bar_generator: ChartBarGenerator | None = None
         self._current_period: str = f"{DEFAULT_NUMBER}{DEFAULT_UNIT}"
         self._period: Period = Period.parse(self._current_period)  # type: ignore[assignment]
+        self._bar_count: int = int(DEFAULT_BAR_COUNT)
 
         # K 线数据缓存
         self._bars: list[dict] = []
@@ -162,8 +102,8 @@ class ChartWindow(WebEngineFluentWidget):
         self._profit_lines: list = []
         self._trade_records: list[TradeData] = []  # 缓存成交记录，重建时重放
 
-        # 数据库（只读）
-        self._database = ArcticDBDatabase()
+        # 数据加载器
+        self._data_loader = ChartDataLoader()
 
         # 设置
         self._settings: dict = {}
@@ -239,7 +179,7 @@ class ChartWindow(WebEngineFluentWidget):
         # 周期选择：数字 + 单位
         toolbar_layout.addWidget(BodyLabel("周期"))
         self._period_num_combo = EditableComboBox()
-        self._period_num_combo.addItems(PRESET_NUMBERS)
+        self._period_num_combo.addItems(PRESET_NUMBERS[DEFAULT_UNIT])
         self._period_num_combo.setText(DEFAULT_NUMBER)
         self._period_num_combo.setFixedWidth(70)
         self._period_num_combo.returnPressed.connect(self._on_period_changed)
@@ -250,8 +190,17 @@ class ChartWindow(WebEngineFluentWidget):
         self._period_unit_combo.addItems(UNITS)
         self._period_unit_combo.setCurrentText(DEFAULT_UNIT)
         self._period_unit_combo.setFixedWidth(60)
-        self._period_unit_combo.currentIndexChanged.connect(self._on_period_changed)
+        self._period_unit_combo.currentIndexChanged.connect(self._on_unit_changed)
         toolbar_layout.addWidget(self._period_unit_combo)
+
+        # 历史条数
+        toolbar_layout.addWidget(BodyLabel("条数"))
+        self._bar_count_combo = ComboBox()
+        self._bar_count_combo.addItems(HISTORY_BAR_COUNTS)
+        self._bar_count_combo.setCurrentText(DEFAULT_BAR_COUNT)
+        self._bar_count_combo.setFixedWidth(85)
+        self._bar_count_combo.currentIndexChanged.connect(self._on_bar_count_changed)
+        toolbar_layout.addWidget(self._bar_count_combo)
 
         # 指标管理
         self._btn_indicator = PushButton("指标")
@@ -432,6 +381,7 @@ class ChartWindow(WebEngineFluentWidget):
             data = {
                 "vt_symbol": self._vt_symbol,
                 "period": self._current_period,
+                "bar_count": self._bar_count,
                 "indicators": self._ind_mgr.get_settings(),
             }
             chart_scheme.save_scheme(name, data)
@@ -492,7 +442,7 @@ class ChartWindow(WebEngineFluentWidget):
         self._analysis_panel.set_loading(True)
 
         # 启动工作线程
-        self._ai_worker = _AIAnalysisWorker(
+        self._ai_worker = AIAnalysisWorker(
             state,
             self._vt_symbol,
             current_price,
@@ -521,18 +471,22 @@ class ChartWindow(WebEngineFluentWidget):
         Parameters
         ----------
         scheme_data : dict
-            方案数据，包含 vt_symbol / period / indicators
+            方案数据，包含 vt_symbol / period / bar_count / indicators
         """
         vt_symbol = scheme_data.get("vt_symbol", "")
         if not vt_symbol:
             return
 
         period = scheme_data.get("period", self._current_period)
+        bar_count = scheme_data.get("bar_count")
         indicators = scheme_data.get("indicators", {})
 
-        # 预设周期和指标到 _settings，set_symbol 会调用 _load_settings 加载
+        # 预设周期、条数和指标到 _settings，set_symbol 会调用 _load_settings 加载
         # 但我们需要在 _load_settings 之后覆盖，所以用延迟方式
-        self._scheme_override = {"period": period, "indicators": indicators}
+        override: dict = {"period": period, "indicators": indicators}
+        if bar_count is not None:
+            override["bar_count"] = bar_count
+        self._scheme_override = override
         self.set_symbol(vt_symbol)
         self._scheme_override = None
 
@@ -758,11 +712,27 @@ class ChartWindow(WebEngineFluentWidget):
         """根据当前周期创建 K 线生成器"""
         p = self._period
         if p.is_second:
+            # 秒级
             self._bar_generator = ChartBarGenerator(
                 on_bar=self._on_bar,
                 second_window=p.second_window,
             )
+        elif p.is_daily and p.is_window:
+            # 多日窗口（2日/3日/5日）：日线 bar → update_bar 聚合
+            self._bar_generator = ChartBarGenerator(
+                on_bar=self._on_1min_bar,
+                window=p.window,
+                on_window_bar=self._on_bar,
+                daily=True,
+            )
+        elif p.is_daily:
+            # 1 日模式
+            self._bar_generator = ChartBarGenerator(
+                on_bar=self._on_bar,
+                daily=True,
+            )
         elif p.is_window:
+            # 分钟/小时窗口
             self._bar_generator = ChartBarGenerator(
                 on_bar=self._on_1min_bar,
                 window=p.window,
@@ -782,11 +752,17 @@ class ChartWindow(WebEngineFluentWidget):
 
     def _on_bar(self, bar: BarData) -> None:
         """目标周期 bar 完成回调"""
-        bar_dict = self._bar_to_dict(bar)
+        bar_dict = bar_to_dict(bar)
 
-        # 防止重复添加：如果和最后一根时间相同则替换（避免历史加载的未完成bar重复）
-        if self._bars and self._bars[-1]["time"] == bar_dict["time"]:
-            self._bars[-1] = bar_dict
+        if self._bars:
+            last_time = self._bars[-1]["time"]
+            if bar_dict["time"] < last_time:
+                # 忽略时间早于已加载历史的 bar（行情回放等场景）
+                return
+            if bar_dict["time"] == last_time:
+                self._bars[-1] = bar_dict
+            else:
+                self._bars.append(bar_dict)
         else:
             self._bars.append(bar_dict)
 
@@ -840,7 +816,31 @@ class ChartWindow(WebEngineFluentWidget):
         if not self._bar_generator or self._rebuilding:
             return
 
-        if self._bar_generator.window > 0:
+        if self._bar_generator._daily:
+            # 日线模式
+            bar = self._bar_generator.bar
+            if not bar:
+                return
+            if self._bar_generator.window > 0:
+                # 多日窗口：合并 window_bar（已完成日）+ 当日 bar
+                wbar = self._bar_generator.window_bar
+                if wbar:
+                    bar_dict = {
+                        "time": wbar.datetime.strftime("%Y-%m-%d"),
+                        "open": wbar.open_price,
+                        "high": max(wbar.high_price, bar.high_price),
+                        "low": min(wbar.low_price, bar.low_price),
+                        "close": bar.close_price,
+                        "volume": wbar.volume + bar.volume,
+                    }
+                else:
+                    bar_dict = bar_to_dict(bar)
+                    bar_dict["time"] = bar.datetime.strftime("%Y-%m-%d")
+            else:
+                # 1 日模式
+                bar_dict = bar_to_dict(bar)
+                bar_dict["time"] = bar.datetime.strftime("%Y-%m-%d")
+        elif self._bar_generator.window > 0:
             # 窗口模式：bar 是 1 分钟中间 bar，window_bar 是目标周期在建 bar
             wbar = self._bar_generator.window_bar
             mbar = self._bar_generator.bar
@@ -859,7 +859,7 @@ class ChartWindow(WebEngineFluentWidget):
                 }
             else:
                 # 窗口刚完成，新窗口第一根分钟 bar 还在建
-                bar_dict = self._bar_to_dict(mbar)
+                bar_dict = bar_to_dict(mbar)
                 bar_dict["time"] = mbar.datetime.replace(
                     second=0, microsecond=0,
                 ).strftime("%Y-%m-%d %H:%M:%S")
@@ -868,21 +868,29 @@ class ChartWindow(WebEngineFluentWidget):
             bar = self._bar_generator.bar
             if not bar:
                 return
-            bar_dict = self._bar_to_dict(bar)
+            bar_dict = bar_to_dict(bar)
             normalized = ChartBarGenerator.normalize_bar_time(
                 bar.datetime, self._bar_generator.second_window,
             )
             bar_dict["time"] = normalized.strftime("%Y-%m-%d %H:%M:%S")
 
         if self._bars:
-            # 只更新 OHLCV，不更新时间（保持 bar 的起始时间）
-            self._bars[-1].update({
-                "open": bar_dict["open"],
-                "high": bar_dict["high"],
-                "low": bar_dict["low"],
-                "close": bar_dict["close"],
-                "volume": bar_dict["volume"],
-            })
+            last_time = self._bars[-1]["time"]
+            if bar_dict["time"] < last_time:
+                # 忽略时间早于已加载历史的 bar（行情回放等场景）
+                return
+            if bar_dict["time"] == last_time:
+                # 更新最后一根 bar 的 OHLCV（保持原始时间）
+                self._bars[-1].update({
+                    "open": bar_dict["open"],
+                    "high": bar_dict["high"],
+                    "low": bar_dict["low"],
+                    "close": bar_dict["close"],
+                    "volume": bar_dict["volume"],
+                })
+            else:
+                # 新 bar（时间晚于最后一根），追加
+                self._bars.append(bar_dict)
         else:
             self._bars.append(bar_dict)
         # 用 bulk_run 将「副图时间轴同步 + 主图更新」打包为单次 JS 执行，
@@ -894,71 +902,28 @@ class ChartWindow(WebEngineFluentWidget):
     # ── 历史数据加载 ──────────────────────────────────
 
     def _load_history(self) -> bool:
-        """从 ArcticDB 加载历史 Tick 并合成 K 线"""
+        """从数据库加载历史 K 线数据"""
         if not self._vt_symbol:
             return False
 
-        parts = self._vt_symbol.rsplit(".", 1)
-        if len(parts) != 2:
+        # 条数为 0 时不加载历史数据，仅接收实时推送
+        if self._bar_count == 0:
             return False
 
-        symbol, exchange_str = parts
-        try:
-            exchange = Exchange(exchange_str)
-        except ValueError:
+        bar_dicts = self._data_loader.load(
+            self._vt_symbol, self._period, self._bar_count,
+        )
+        if not bar_dicts:
             return False
 
-        # 计算需要多少历史数据
-        p = self._period
-        minutes_needed = p.history_minutes(HISTORY_BAR_COUNT)
-
-        end = datetime.now()
-        start = end - timedelta(minutes=minutes_needed)
-
-        # 加载 Tick
-        ticks = self._database.load_tick_data(symbol, exchange, start, end)
-        if not ticks:
-            return False
-
-        # 用临时生成器从 Tick 合成 K 线
-        temp_bars: list[BarData] = []
-
-        def on_temp_bar(bar: BarData):
-            temp_bars.append(bar)
-
-        if p.is_second:
-            temp_gen = ChartBarGenerator(on_bar=on_temp_bar, second_window=p.second_window)
-        elif p.is_window:
-            temp_gen = ChartBarGenerator(
-                on_bar=lambda b: temp_gen.update_bar(b),
-                window=p.window,
-                on_window_bar=on_temp_bar,
-                interval=p.interval,
-            )
-        else:
-            temp_gen = ChartBarGenerator(on_bar=on_temp_bar)
-
-        for tick in ticks:
-            temp_gen.update_tick(tick)
-
-        # 推送最后一根未完成的 bar
-        temp_gen.generate()
-
-        if not temp_bars:
-            return False
-
-        # 只取最后 N 根
-        if len(temp_bars) > HISTORY_BAR_COUNT:
-            temp_bars = temp_bars[-HISTORY_BAR_COUNT:]
-
-        # 转为 dict 列表（使用 extend 保持与 _ind_mgr._bars 的共享引用）
-        self._bars.extend(self._bar_to_dict(b) for b in temp_bars)
+        # 使用 extend 保持与 _ind_mgr._bars 的共享引用
+        self._bars.extend(bar_dicts)
 
         # 初始化图表
         df = pd.DataFrame(self._bars)
         self._chart.set(df)
         self._chart_initialized = True
-        self._chart_ready = True  # 图表已准备就绪，可以执行 JS 操作
+        self._chart_ready = True
 
         return True
 
@@ -976,18 +941,6 @@ class ChartWindow(WebEngineFluentWidget):
         else:
             series = pd.Series(bar_dict)
             self._chart.update(series)
-
-    @staticmethod
-    def _bar_to_dict(bar: BarData) -> dict:
-        """BarData → lightweight-charts dict"""
-        return {
-            "time": bar.datetime.strftime("%Y-%m-%d %H:%M:%S"),
-            "open": bar.open_price,
-            "high": bar.high_price,
-            "low": bar.low_price,
-            "close": bar.close_price,
-            "volume": bar.volume,
-        }
 
     # ── 指标管理（UI 事件） ──────────────────────────
 
@@ -1058,14 +1011,19 @@ class ChartWindow(WebEngineFluentWidget):
 
     def _snap_to_bar_time(self, dt: datetime) -> str:
         """将时间对齐到当前周期的 K 线起始时间"""
-        if self._period.is_second:
+        if self._period.is_daily:
+            # 日线模式：用交易日归整
+            from guanlan.core.utils.trading_period import get_trading_date
+            return get_trading_date(dt)
+        elif self._period.is_second:
             normalized = ChartBarGenerator.normalize_bar_time(
                 dt, self._period.second_window,
             )
         elif self._period.is_window:
-            # 多分钟窗口：对齐到窗口边界
-            minute = (dt.minute // self._period.window) * self._period.window
-            normalized = dt.replace(minute=minute, second=0, microsecond=0)
+            # 分钟/小时窗口：用 total_minutes 归整
+            normalized = ChartBarGenerator.normalize_bar_time(
+                dt, window=self._period.window,
+            )
         else:
             # 1 分钟模式：截断秒
             normalized = dt.replace(second=0, microsecond=0)
@@ -1183,6 +1141,17 @@ class ChartWindow(WebEngineFluentWidget):
 
     # ── 周期切换 ──────────────────────────────────────
 
+    def _on_unit_changed(self) -> None:
+        """单位切换时更新数值预设列表"""
+        unit = self._period_unit_combo.currentText()
+        presets = PRESET_NUMBERS.get(unit, PRESET_NUMBERS[DEFAULT_UNIT])
+        self._period_num_combo.blockSignals(True)
+        self._period_num_combo.clear()
+        self._period_num_combo.addItems(presets)
+        self._period_num_combo.setText(presets[0] if presets else "1")
+        self._period_num_combo.blockSignals(False)
+        self._on_period_changed()
+
     def _on_period_changed(self) -> None:
         """数字或单位变更时触发"""
         num_text = self._period_num_combo.text().strip()
@@ -1211,16 +1180,33 @@ class ChartWindow(WebEngineFluentWidget):
             self._init_chart()
             self._save_settings()
 
+    def _on_bar_count_changed(self) -> None:
+        """历史条数变更时触发"""
+        text = self._bar_count_combo.currentText()
+        try:
+            count = int(text)
+        except ValueError:
+            return
+        if count == self._bar_count:
+            return
+
+        self._bar_count = count
+        if self._vt_symbol:
+            self._init_chart()
+            self._save_settings()
+
     # ── 持久化 ────────────────────────────────────────
 
     def _load_settings(self) -> None:
         """加载合约配置"""
         self._settings = chart_setting.get_setting(self._vt_symbol)
 
-        # 方案覆盖：apply_scheme 设置的周期和指标优先
+        # 方案覆盖：apply_scheme 设置的周期、条数和指标优先
         if self._scheme_override:
             self._settings["period"] = self._scheme_override["period"]
             self._settings["indicators"] = self._scheme_override["indicators"]
+            if "bar_count" in self._scheme_override:
+                self._settings["bar_count"] = self._scheme_override["bar_count"]
 
         # 恢复周期
         saved_period = self._settings.get("period", self._current_period)
@@ -1232,17 +1218,35 @@ class ChartWindow(WebEngineFluentWidget):
             self._period = p
             self._period_num_combo.blockSignals(True)
             self._period_unit_combo.blockSignals(True)
-            self._period_num_combo.setText(num_str)
+            # 先切换单位和预设列表，再设数字
             self._period_unit_combo.setCurrentText(unit_str)
+            presets = PRESET_NUMBERS.get(unit_str, PRESET_NUMBERS[DEFAULT_UNIT])
+            self._period_num_combo.clear()
+            self._period_num_combo.addItems(presets)
+            idx = self._period_num_combo.findText(num_str)
+            if idx >= 0:
+                self._period_num_combo.setCurrentIndex(idx)
+            self._period_num_combo.setText(num_str)
             self._period_num_combo.blockSignals(False)
             self._period_unit_combo.blockSignals(False)
 
+        # 恢复历史条数
+        saved_count = str(self._settings.get("bar_count", DEFAULT_BAR_COUNT))
+        self._bar_count_combo.blockSignals(True)
+        self._bar_count_combo.setCurrentText(saved_count)
+        self._bar_count_combo.blockSignals(False)
+        try:
+            self._bar_count = int(saved_count)
+        except ValueError:
+            self._bar_count = int(DEFAULT_BAR_COUNT)
+
     def _save_settings(self) -> None:
-        """保存品种的周期和指标参数"""
+        """保存品种的周期、条数和指标参数"""
         if not self._vt_symbol:
             return
 
         self._settings["period"] = self._current_period
+        self._settings["bar_count"] = self._bar_count
         self._settings["indicators"] = self._ind_mgr.get_settings()
 
         chart_setting.save_setting(self._vt_symbol, self._settings)

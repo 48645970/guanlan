@@ -146,6 +146,11 @@ class GuanlanConfig(QConfig):
     enableSound = ConfigItem("Sound", "Enable", True, BoolValidator())
     soundVolume = RangeConfigItem("Sound", "Volume", 80, RangeValidator(0, 100))
 
+    # ==================== 自动任务配置 ====================
+    autoUpdateContract = ConfigItem("AutoTask", "UpdateContract", True, BoolValidator())
+    autoDownloadData = ConfigItem("AutoTask", "DownloadData", True, BoolValidator())
+    autoDataRecording = ConfigItem("AutoTask", "DataRecording", False, BoolValidator())
+
     # ==================== 更新配置 ====================
     checkUpdateAtStartUp = ConfigItem("Update", "CheckUpdateAtStartUp", True, BoolValidator())
 

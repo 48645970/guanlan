@@ -8,6 +8,7 @@ Author: 海山观澜
 from datetime import datetime
 
 from PySide6.QtCore import Qt, Signal, QTimer, QAbstractItemModel, QEvent
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QGridLayout, QCompleter, QSpacerItem, QSizePolicy,
@@ -23,6 +24,7 @@ from qfluentwidgets import (
 )
 
 from guanlan.ui.common.mixin import ThemeMixin
+from guanlan.ui.common.config import cfg
 from guanlan.core.app import AppEngine
 from guanlan.core.trader.data import DataRecorderEngine
 from guanlan.core.events import signal_bus
@@ -84,6 +86,10 @@ class DataRecorderInterface(ThemeMixin, ScrollArea):
         # 录制指示灯
         self.recording_dot = BodyLabel("●", toolbar)
         self.recording_dot.setObjectName("recordingDot")
+        self.recording_dot.setTextColor(
+            light=QColor(230, 0, 18),
+            dark=QColor(230, 0, 18),
+        )
         self.recording_dot.hide()
 
         self.recording_label = BodyLabel("记录中", toolbar)
@@ -246,6 +252,10 @@ class DataRecorderInterface(ThemeMixin, ScrollArea):
     def _on_account_connected(self, env_name: str) -> None:
         """账户连接成功"""
         self._update_connection_status()
+
+        # 自动行情记录：连接后自动开始
+        if cfg.get(cfg.autoDataRecording) and not self.engine.is_recording:
+            self._start_recording()
 
     def _on_account_disconnected(self, env_name: str) -> None:
         """账户断开连接"""

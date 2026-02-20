@@ -7,14 +7,13 @@
 Author: 海山观澜
 """
 
-import logging
-
 import pandas as pd
 
 from guanlan.core.constants import COLOR_UP, COLOR_DOWN
 from guanlan.core.indicators import get_indicator, BaseIndicator
+from guanlan.core.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # 每个副图占总高度的比例
 SUBCHART_HEIGHT = 0.15
@@ -467,6 +466,16 @@ class IndicatorManager:
         subchart.legend(
             visible=True, ohlc=False, percent=False, lines=True,
         )
+
+        # 本地化：与主图一致的中文日期格式
+        subchart.run_script(f"""
+            {subchart.id}.chart.applyOptions({{
+                localization: {{
+                    locale: 'zh-CN',
+                    dateFormat: 'yyyy-MM-dd',
+                }}
+            }})
+        """)
 
         # 创建透明 Line 系列覆盖时间轴
         # Line 系列对时间戳容错更好，不会触发 Candlestick 着色器的 null 断言

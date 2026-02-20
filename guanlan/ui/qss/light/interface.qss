@@ -107,11 +107,6 @@ FeatureCard:hover {
     border-radius: 10px;
 }
 
-/* ===== 录制指示灯 ===== */
-#recordingDot {
-    color: red;
-    font-size: 16px;
-}
 
 /* ===== 首页监控面板 ===== */
 #tradingPanel, #accountPanel, #aiChatPanel,

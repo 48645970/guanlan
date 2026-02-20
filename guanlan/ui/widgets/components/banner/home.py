@@ -75,7 +75,7 @@ class LinkCard(QFrame):
         super().mouseReleaseEvent(event)
         QDesktopServices.openUrl(self.url)
         # 发送消息提示
-        signal_bus.show_message.emit("使用帮助", "已在浏览器中打开", "success")
+        signal_bus.show_message.emit("作者专栏", "已在浏览器中打开", "success")
 
 
 class _BadgeLabel(QLabel):

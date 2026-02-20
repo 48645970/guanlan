@@ -61,6 +61,14 @@ class BaseMonitor(TableWidget):
         self._data_by_row: list[dict] = []
         self._header_keys: list[str] = list(self.headers.keys())
 
+        # 列宽自动增长：跟踪每列最大文本长度，内容变宽时自动调整
+        self._max_text_lens: list[int] = [0] * len(self.headers)
+        self._width_dirty: bool = False
+        self._resize_timer = QTimer(self)
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.setInterval(200)
+        self._resize_timer.timeout.connect(self._resize_columns)
+
         self._init_table()
 
     def _init_table(self) -> None:
@@ -82,9 +90,6 @@ class BaseMonitor(TableWidget):
         for col, setting in enumerate(self.headers.values()):
             if col < last:
                 header.resizeSection(col, setting.get("width", 80))
-
-        # 首批数据到达后自动适配一次列宽
-        self._auto_sized = False
 
     # ── 数据处理 ──
 
@@ -108,10 +113,10 @@ class BaseMonitor(TableWidget):
 
         self._fill_row(row, data)
 
-        # 首批数据到达后延迟自动适配列宽（仅一次）
-        if not self._auto_sized:
-            self._auto_sized = True
-            QTimer.singleShot(0, self._resize_columns)
+        # 列内容变宽 → 调度 debounce 列宽调整
+        if self._width_dirty:
+            self._width_dirty = False
+            self._resize_timer.start()
 
     def process_batch(self, data_list: list[dict], scroll: bool = False) -> None:
         """批量处理数据：暂停 UI 重绘，批量写入后统一刷新"""
@@ -129,6 +134,13 @@ class BaseMonitor(TableWidget):
             value = data.get(key, "")
 
             text = self._format_value(value, data, setting)
+
+            # 检测列内容是否变宽
+            text_len = len(text)
+            if text_len > self._max_text_lens[col]:
+                self._max_text_lens[col] = text_len
+                self._width_dirty = True
+
             item = QTableWidgetItem(text)
             align = setting.get("align", "center")
             if align == "left":
@@ -219,6 +231,8 @@ class BaseMonitor(TableWidget):
         self._rows.clear()
         self._row_data.clear()
         self._data_by_row.clear()
+        self._max_text_lens = [0] * len(self.headers)
+        self._width_dirty = False
 
     def _resize_columns(self) -> None:
         """调整所有列宽"""
@@ -506,6 +520,7 @@ class StrategyLogTable(BaseMonitor):
         self.setUpdatesEnabled(True)
         self.scrollToBottom()
 
-        if not self._auto_sized:
-            self._auto_sized = True
-            QTimer.singleShot(0, self._resize_columns)
+        # 列内容变宽 → 调度 debounce 列宽调整
+        if self._width_dirty:
+            self._width_dirty = False
+            self._resize_timer.start()
