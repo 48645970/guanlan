@@ -240,6 +240,25 @@ class Vars(BaseVars):
 
 ## 安装
 
+### 前置条件
+
+本项目基于 VNPY 4.3，安装前需确保系统环境满足以下要求：
+
+- **Python 3.13** 64 位
+- **TA-Lib C 库** — 技术指标计算依赖，需提前安装
+- **C/C++ 编译工具链** — 部分依赖包含 C 扩展，需要编译环境
+
+**各平台环境准备：**
+
+| 平台 | 关键依赖 |
+|------|---------|
+| **Windows** | [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)、TA-Lib 预编译 whl |
+| **Ubuntu** | `build-essential`、`python3-dev`、TA-Lib 源码编译 |
+
+> 详细的系统依赖安装步骤请参考 VNPY 官方文档：[Windows 安装](https://www.vnpy.com/docs/cn/community/install/windows_install.html) | [Ubuntu 安装](https://www.vnpy.com/docs/cn/community/install/ubuntu_install.html)
+
+### 安装步骤
+
 ```bash
 # 克隆仓库
 git clone https://github.com/48645970/guanlan.git
