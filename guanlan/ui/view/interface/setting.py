@@ -246,7 +246,7 @@ class SettingInterface(ThemeMixin, ScrollArea):
 
     def _init_db_card(self) -> None:
         """初始化数据库配置卡片"""
-        DB_DRIVERS = ["sqlite", "mysql", "postgresql", "mongodb"]
+        DB_DRIVERS = ["arctic", "sqlite", "mysql", "postgresql", "mongodb"]
 
         # 数据库类型
         cb_driver = ComboBox(self)

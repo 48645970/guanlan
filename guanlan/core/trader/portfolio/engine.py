@@ -45,7 +45,8 @@ from vnpy.trader.constant import (
     Offset,
 )
 from vnpy.trader.utility import extract_vt_symbol, round_to
-from vnpy.trader.database import BaseDatabase, get_database, DB_TZ
+from vnpy.trader.database import BaseDatabase, DB_TZ
+from guanlan.core.trader.database import get_database
 
 from guanlan.core.trader.event import Event, EventEngine
 from guanlan.core.trader.engine import BaseEngine, MainEngine

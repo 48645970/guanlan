@@ -1,5 +1,16 @@
 # 更新日志
 
+## v2.3.1 (2026-02-21)
+
+### 🐛 问题修复
+
+- 补全 requirements.txt 缺失依赖：lightweight-charts、pyqtgraph、loguru、pytdx、vnpy-sqlite
+- 修复行情记录界面 eventFilter 在初始化阶段访问未创建属性导致崩溃的问题
+- 统一数据库入口 `get_database()`，根据配置选择后端（默认 ArcticDB）
+- 设置界面数据库类型新增 ArcticDB 选项并设为默认
+
+---
+
 ## v2.3.0 (2026-02-19)
 
 ### 🎉 新增功能

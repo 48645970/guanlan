@@ -338,6 +338,8 @@ class DataRecorderInterface(ThemeMixin, ScrollArea):
 
     def eventFilter(self, obj, event) -> bool:
         """输入框获得焦点时刷新合约补全列表"""
+        if not hasattr(self, 'symbol_line'):
+            return super().eventFilter(obj, event)
         if obj is self.symbol_line and event.type() == QEvent.FocusIn:
             model: QAbstractItemModel = self.symbol_completer.model()
             model.setStringList(AppEngine.instance().vt_symbols)

@@ -125,8 +125,8 @@ class GuanlanConfig(QConfig):
     # ==================== 数据库配置 ====================
     databaseTimezone = ConfigItem("Database", "Timezone", get_localzone_name())
     databaseDriver = OptionsConfigItem(
-        "Database", "Driver", "sqlite",
-        OptionsValidator(["sqlite", "mysql", "postgresql", "mongodb"]),
+        "Database", "Driver", "arctic",
+        OptionsValidator(["arctic", "sqlite", "mysql", "postgresql", "mongodb"]),
         restart=True
     )
     databaseName = ConfigItem("Database", "Name", "database.db")

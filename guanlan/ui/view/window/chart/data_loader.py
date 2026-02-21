@@ -16,7 +16,7 @@ from vnpy.trader.constant import Exchange, Interval
 from vnpy.trader.object import BarData
 
 from guanlan.core.trader.bar_generator import ChartBarGenerator
-from guanlan.core.trader.database import ArcticDBDatabase
+from guanlan.core.trader.database import get_database
 from guanlan.core.utils.period import Period
 
 
@@ -44,7 +44,7 @@ class ChartDataLoader:
     """
 
     def __init__(self) -> None:
-        self._database = ArcticDBDatabase()
+        self._database = get_database()
 
     def load(
         self, vt_symbol: str, period: Period, count: int,

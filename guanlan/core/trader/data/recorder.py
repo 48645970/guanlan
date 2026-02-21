@@ -27,7 +27,7 @@ from vnpy.trader.utility import BarGenerator
 from guanlan.core.trader.event import Event, EventEngine
 from guanlan.core.trader.engine import MainEngine
 from guanlan.core.app import AppEngine
-from guanlan.core.trader.database import ArcticDBDatabase
+from guanlan.core.trader.database import get_database
 from guanlan.core.utils.common import load_json_file, save_json_file
 from guanlan.core.utils.symbol_converter import SymbolConverter
 
@@ -51,7 +51,7 @@ class DataRecorderEngine:
         app = AppEngine.instance()
         self.main_engine: MainEngine = app.main_engine
         self.event_engine: EventEngine = app.event_engine
-        self.database = ArcticDBDatabase()
+        self.database = get_database()
 
         # UI 回调
         self._on_log = on_log

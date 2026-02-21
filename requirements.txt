@@ -18,10 +18,13 @@ vnpy-ctp>=6.7.11.2
 
 # 数据存储
 arcticdb>=5.0.0
+vnpy-sqlite>=1.0.4
 
 # 图形界面
 PySide6>=6.5.0
 PySide6-Fluent-Widgets>=1.11.0
+lightweight-charts>=2.2
+pyqtgraph>=0.13.0
 
 # 技术分析
 TA-Lib>=0.4.24
@@ -45,6 +48,12 @@ pydantic>=2.0.0
 # AI 服务
 openai>=1.0.0
 markdown>=3.5.0
+
+# 日志
+loguru>=0.7.0
+
+# 通达信数据读取
+pytdx>=1.72
 
 # 工具库
 python-dotenv>=1.0.0

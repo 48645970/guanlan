@@ -15,7 +15,7 @@ from vnpy.trader.constant import Interval, Exchange
 from vnpy.trader.object import BarData, HistoryRequest
 from vnpy.trader.database import BarOverview
 
-from guanlan.core.trader.database import ArcticDBDatabase
+from guanlan.core.trader.database import get_database
 from guanlan.core.setting.contract import load_contracts, load_favorites
 from guanlan.core.utils.symbol_converter import SymbolConverter
 
@@ -27,7 +27,7 @@ class DataManagerEngine:
     """
 
     def __init__(self) -> None:
-        self.database = ArcticDBDatabase()
+        self.database = get_database()
 
     def get_bar_overview(self) -> list[BarOverview]:
         """查询 K 线数据概况"""
