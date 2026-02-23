@@ -2,7 +2,13 @@
 
 /* ===== 工具栏 ===== */
 #chartToolbar {
+    background-color: rgb(243, 243, 243);
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* ===== 图表容器 ===== */
+#chartContainer {
+    background-color: rgb(243, 243, 243);
 }
 
 /* ===== 合约标签 ===== */

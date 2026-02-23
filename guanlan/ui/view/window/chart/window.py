@@ -360,7 +360,7 @@ class ChartWindow(WebEngineFluentWidget):
 
         # 同步 QFluentWidgets 的主题到 StyleSheet
         theme = Theme.DARK if isDarkTheme() else Theme.LIGHT
-        StyleSheet.apply(self, "chart.qss", theme=theme)
+        StyleSheet.apply(self, ["common.qss", "window.qss", "chart.qss"], theme=theme)
 
     def _on_save_scheme(self) -> None:
         """保存当前配置为方案"""

@@ -22,7 +22,7 @@ from vnpy.trader.utility import ZoneInfo
 
 APP_NAME = "观澜量化"
 APP_NAME_EN = "Guanlan Quant"
-APP_VERSION = "2.3.1"
+APP_VERSION = "2.3.2"
 APP_AUTHOR = "海山观澜"
 APP_YEAR = "2024-2030"
 

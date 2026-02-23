@@ -128,6 +128,10 @@ class TdxService:
 
         raw_symbol = parts[1]  # OI2605
 
+        # 跳过含特殊字符的非标准合约（如通达信仿真合约 L-F2605、PP-F2605）
+        if not raw_symbol.isalnum():
+            return None
+
         # 市场编号映射
         exchange = MARKET_EXCHANGE_MAP.get(market_code)
         if not exchange:

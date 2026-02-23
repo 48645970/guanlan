@@ -1,5 +1,17 @@
 # 更新日志
 
+## v2.3.2 (2026-02-22)
+
+### 🐛 问题修复
+
+- 补充缺失依赖：akshare、pygame
+- 修复实时图表窗口顶部控件背景色为白色的问题：为 #chartToolbar 和 #chartContainer 添加背景色样式
+- 修复实时图表窗口样式文件加载不完整的问题：补全加载 common.qss 和 window.qss
+
+感谢 [@xiaoqizheng0033](https://github.com/xiaoqizheng0033) 的反馈和修复方案。
+
+---
+
 ## v2.3.1 (2026-02-21)
 
 ### 🐛 问题修复

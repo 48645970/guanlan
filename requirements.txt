@@ -55,6 +55,12 @@ loguru>=0.7.0
 # 通达信数据读取
 pytdx>=1.72
 
+# 数据源
+akshare>=1.12.0
+
+# 音频
+pygame>=2.5.0
+
 # 工具库
 python-dotenv>=1.0.0
 pytz>=2023.3
