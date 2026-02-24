@@ -5,7 +5,7 @@
 Author: 海山观澜
 """
 
-from datetime import datetime
+from guanlan.core.utils.trading_period import beijing_now
 
 from PySide6.QtGui import QHelpEvent
 from PySide6.QtWidgets import QToolTip
@@ -92,7 +92,7 @@ class LogMonitor(MonitorPanel):
 
     def _convert_data(self, log: LogData) -> dict:
         return {
-            "time": datetime.now().strftime("%H:%M:%S"),
+            "time": beijing_now().strftime("%H:%M:%S"),
             "level": _LEVEL_NAMES.get(log.level, str(log.level)),
             "source": log.gateway_name or "System",
             "msg": log.msg,

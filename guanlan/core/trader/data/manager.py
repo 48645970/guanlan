@@ -12,8 +12,8 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from vnpy.trader.constant import Interval, Exchange
-from vnpy.trader.object import BarData, HistoryRequest
-from vnpy.trader.database import BarOverview
+from vnpy.trader.object import BarData, TickData, HistoryRequest
+from vnpy.trader.database import BarOverview, TickOverview
 
 from guanlan.core.trader.database import get_database
 from guanlan.core.setting.contract import load_contracts, load_favorites
@@ -45,6 +45,28 @@ class DataManagerEngine:
         return self.database.load_bar_data(
             symbol, exchange, interval, start, end
         )
+
+    def get_tick_overview(self) -> list[TickOverview]:
+        """查询 Tick 数据概况"""
+        return self.database.get_tick_overview()
+
+    def load_tick_data(
+        self,
+        symbol: str,
+        exchange: Exchange,
+        start: datetime,
+        end: datetime
+    ) -> list[TickData]:
+        """加载 Tick 数据"""
+        return self.database.load_tick_data(symbol, exchange, start, end)
+
+    def delete_tick_data(
+        self,
+        symbol: str,
+        exchange: Exchange,
+    ) -> int:
+        """删除 Tick 数据"""
+        return self.database.delete_tick_data(symbol, exchange)
 
     def delete_bar_data(
         self,

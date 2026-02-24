@@ -22,7 +22,7 @@ from qfluentwidgets import (
     PrimaryDropDownPushButton, RoundMenu, Action,
     TreeWidget, TableWidget, DateEdit,
     CheckBox, IndeterminateProgressBar,
-    InfoBar, InfoBarIcon, InfoBarPosition,
+    InfoBar, InfoBarPosition,
     MessageBox, StateToolTip,
     FluentIcon,
 )
@@ -31,6 +31,7 @@ from guanlan.ui.common.mixin import ThemeMixin
 from guanlan.ui.widgets import ThemedDialog
 from guanlan.core.trader.data import DataManagerEngine
 from guanlan.core.constants import Interval, Exchange
+from vnpy.trader.database import TickOverview
 from guanlan.core.events.signal_bus import signal_bus
 from guanlan.core.setting.contract import load_contracts
 from guanlan.core.utils.symbol_converter import SymbolConverter
@@ -145,6 +146,13 @@ class TdxImportDialog(ThemedDialog):
         # 标题
         self.viewLayout.addWidget(SubtitleLabel("通达信本地数据导入", self))
 
+        # 扫描提示（标题下方、勾选上方）
+        self._scan_label = CaptionLabel("正在扫描通达信目录...", self)
+        self._progress_bar = IndeterminateProgressBar(self)
+        self._progress_bar.start()
+        self.viewLayout.addWidget(self._scan_label)
+        self.viewLayout.addWidget(self._progress_bar)
+
         # 过滤行
         filter_row = QHBoxLayout()
         self._filter_daily = CheckBox("日线")
@@ -161,21 +169,6 @@ class TdxImportDialog(ThemedDialog):
         filter_row.addWidget(self._filter_continuous)
         filter_row.addStretch(1)
         self.viewLayout.addLayout(filter_row)
-
-        # 扫描提示
-        self._scan_bar = InfoBar(
-            icon=InfoBarIcon.INFORMATION,
-            title="扫描中",
-            content="正在扫描通达信目录...",
-            orient=Qt.Horizontal,
-            isClosable=False,
-            duration=-1,
-            parent=self,
-        )
-        self._progress_bar = IndeterminateProgressBar(self)
-        self._progress_bar.start()
-        self.viewLayout.addWidget(self._scan_bar)
-        self.viewLayout.addWidget(self._progress_bar)
 
         # 数据表格
         self.table = TableWidget(self)
@@ -224,22 +217,14 @@ class TdxImportDialog(ThemedDialog):
     def _on_scan_finished(self, file_list: list[TdxFileInfo]) -> None:
         """扫描完成回调"""
         self.file_list = file_list
-        self._scan_bar.hide()
         self._progress_bar.stop()
         self._progress_bar.hide()
 
         if not file_list:
-            self._empty_bar = InfoBar(
-                icon=InfoBarIcon.WARNING,
-                title="未发现数据",
-                content="通达信目录下未发现期货数据文件",
-                orient=Qt.Horizontal,
-                isClosable=False,
-                duration=-1,
-                parent=self,
-            )
-            self.viewLayout.addWidget(self._empty_bar)
+            self._scan_label.setText("未发现数据：通达信目录下未发现期货数据文件")
             return
+
+        self._scan_label.hide()
 
         self.table.show()
         self.yesButton.setEnabled(True)
@@ -326,8 +311,9 @@ class DateRangeDialog(ThemedDialog):
     def __init__(self, start: datetime, end: datetime, parent=None) -> None:
         super().__init__(parent)
 
-        # 默认区间：最近一个月
-        now = datetime.now()
+        # 默认区间：从今天往前推一个月（北京时间）
+        from guanlan.core.utils.trading_period import beijing_now
+        now = beijing_now()
         one_month_ago = now - timedelta(days=30)
 
         self.viewLayout.addWidget(SubtitleLabel("选择数据区间", self))
@@ -604,18 +590,76 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
             self.tree.setItemWidget(item, 9, export_btn)
             self.tree.setItemWidget(item, 10, delete_btn)
 
+        # ── Tick 数据 ──
+        tick_overviews = self.engine.get_tick_overview()
+        tick_overviews.sort(key=lambda x: x.symbol)
+
+        tick_root = QTreeWidgetItem()
+        tick_root.setText(0, "Tick数据")
+
+        tick_exchange_nodes: dict[str, QTreeWidgetItem] = {}
+
+        for overview in tick_overviews:
+            ex_val = overview.exchange.value
+            ex_node = tick_exchange_nodes.get(ex_val)
+            if not ex_node:
+                ex_node = QTreeWidgetItem(tick_root)
+                ex_node.setText(0, ex_val)
+                tick_exchange_nodes[ex_val] = ex_node
+
+            item = QTreeWidgetItem(ex_node)
+
+            commodity = SymbolConverter.extract_commodity(overview.symbol)
+            contract_info = contracts.get(commodity, {})
+            name = contract_info.get("name", "")
+
+            item.setText(1, f"{overview.symbol}.{overview.exchange.value}")
+            item.setText(2, overview.symbol)
+            item.setText(3, name)
+            item.setText(4, overview.exchange.value)
+            item.setText(5, str(overview.count))
+            item.setText(6, overview.start.strftime("%Y-%m-%d %H:%M:%S"))
+            item.setText(7, overview.end.strftime("%Y-%m-%d %H:%M:%S"))
+
+            show_btn = PushButton("查看", self)
+            show_btn.setFixedSize(80, 30)
+            show_btn.clicked.connect(partial(
+                self._show_tick_data,
+                overview.symbol, overview.exchange,
+                overview.start, overview.end
+            ))
+
+            delete_btn = PushButton("删除", self)
+            delete_btn.setFixedSize(80, 30)
+            delete_btn.clicked.connect(partial(
+                self._delete_tick_data,
+                overview.symbol, overview.exchange, item
+            ))
+
+            for col in range(8, 11):
+                item.setSizeHint(col, QSize(20, 40))
+
+            self.tree.setItemWidget(item, 8, show_btn)
+            self.tree.setItemWidget(item, 10, delete_btn)
+
         # 添加顶层节点并展开
-        self.tree.addTopLevelItems(list(interval_nodes.values()))
-        for node in interval_nodes.values():
+        all_nodes = list(interval_nodes.values()) + [tick_root]
+        self.tree.addTopLevelItems(all_nodes)
+        for node in all_nodes:
             node.setExpanded(True)
 
         # 显示数据统计
         if show_info:
-            if overviews:
-                total_count = sum(o.count for o in overviews)
+            total = len(overviews) + len(tick_overviews)
+            if total:
+                bar_count = sum(o.count for o in overviews)
+                tick_count = sum(o.count for o in tick_overviews)
                 InfoBar.success(
                     title="数据概览",
-                    content=f"共 {len(overviews)} 个合约，{total_count} 条数据",
+                    content=(
+                        f"K线 {len(overviews)} 个合约 {bar_count} 条，"
+                        f"Tick {len(tick_overviews)} 个合约 {tick_count} 条"
+                    ),
                     position=InfoBarPosition.TOP,
                     duration=3000, parent=self
                 )
@@ -660,10 +704,18 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
         )
         self._table_title.show()
 
+        # 恢复 K 线表头
+        bar_headers = [
+            "时间", "开盘价", "最高价", "最低价",
+            "收盘价", "成交量", "成交额", "持仓量"
+        ]
+        self.table.setColumnCount(len(bar_headers))
+        self.table.setHorizontalHeaderLabels(bar_headers)
+
         self.table.setRowCount(0)
         self.table.setRowCount(len(bars))
 
-        for row, bar in enumerate(bars):
+        for row, bar in enumerate(reversed(bars)):
             items = [
                 bar.datetime.strftime("%Y-%m-%d %H:%M:%S"),
                 str(round(bar.open_price, 3)),
@@ -758,6 +810,98 @@ class DataManagerInterface(ThemeMixin, ScrollArea):
         InfoBar.success(
             title="删除成功",
             content=f"已删除 {count} 条数据",
+            orient=Qt.Vertical, isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=4000, parent=self
+        )
+
+    # ── Tick 数据查看 / 删除 ─────────────────────────────────
+
+    def _show_tick_data(
+        self,
+        symbol: str,
+        exchange: Exchange,
+        start: datetime,
+        end: datetime
+    ) -> None:
+        """查看 Tick 数据"""
+        dialog = DateRangeDialog(start, end, self.window())
+        if not dialog.exec():
+            return
+
+        start, end = dialog.get_date_range()
+        ticks = self.engine.load_tick_data(symbol, exchange, start, end)
+
+        if not ticks:
+            InfoBar.info(
+                title="提示", content="所选区间无数据",
+                position=InfoBarPosition.TOP,
+                duration=3000, parent=self
+            )
+            return
+
+        self._table_title.setText(
+            f"{symbol}.{exchange.value}  Tick  共 {len(ticks)} 条"
+        )
+        self._table_title.show()
+
+        # 切换表头为 Tick 格式
+        tick_headers = [
+            "时间", "最新价", "成交量", "买一价",
+            "买一量", "卖一价", "卖一量", "持仓量"
+        ]
+        self.table.setColumnCount(len(tick_headers))
+        self.table.setHorizontalHeaderLabels(tick_headers)
+
+        self.table.setRowCount(0)
+        self.table.setRowCount(len(ticks))
+
+        for row, tick in enumerate(reversed(ticks)):
+            items = [
+                tick.datetime.strftime("%Y-%m-%d %H:%M:%S"),
+                str(round(tick.last_price, 3)),
+                str(tick.volume),
+                str(round(tick.bid_price_1, 3)),
+                str(tick.bid_volume_1),
+                str(round(tick.ask_price_1, 3)),
+                str(tick.ask_volume_1),
+                str(tick.open_interest),
+            ]
+            for col, text in enumerate(items):
+                cell = QTableWidgetItem(text)
+                cell.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(row, col, cell)
+
+        self.table.show()
+
+    def _delete_tick_data(
+        self,
+        symbol: str,
+        exchange: Exchange,
+        item: QTreeWidgetItem
+    ) -> None:
+        """删除 Tick 数据"""
+        box = MessageBox(
+            "删除确认",
+            f"确认删除 {symbol} {exchange.value} 的全部 Tick 数据？",
+            self.window()
+        )
+        if not box.exec():
+            return
+
+        count = self.engine.delete_tick_data(symbol, exchange)
+
+        parent = item.parent()
+        if parent:
+            parent.removeChild(item)
+            if parent.childCount() == 0:
+                grandparent = parent.parent()
+                if grandparent:
+                    grandparent.removeChild(parent)
+
+        InfoBar.success(
+            title="删除成功",
+            content=f"已删除 {count} 条 Tick 数据",
             orient=Qt.Vertical, isClosable=True,
             position=InfoBarPosition.TOP,
             duration=4000, parent=self

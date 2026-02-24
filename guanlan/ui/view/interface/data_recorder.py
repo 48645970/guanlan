@@ -5,7 +5,7 @@
 Author: 海山观澜
 """
 
-from datetime import datetime
+from guanlan.core.utils.trading_period import beijing_now
 
 from PySide6.QtCore import Qt, Signal, QTimer, QAbstractItemModel, QEvent
 from PySide6.QtGui import QColor
@@ -36,6 +36,7 @@ class DataRecorderInterface(ThemeMixin, ScrollArea):
     # 信号桥接（从引擎回调 → Qt 主线程）
     signal_log = Signal(str)
     signal_update = Signal(list, list)
+    signal_contract_ready = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -102,12 +103,27 @@ class DataRecorderInterface(ThemeMixin, ScrollArea):
         self.record_button.setFixedSize(120, 32)
         self.record_button.clicked.connect(self._toggle_recording)
 
+        # 清理失效按钮（合约查询完毕后启用）
+        self.clean_btn = PrimaryPushButton("清理失效", toolbar, FluentIcon.DELETE)
+        self.clean_btn.setFixedHeight(32)
+        self.clean_btn.setEnabled(False)
+        self.clean_btn.setObjectName("dangerButton")
+        self.clean_btn.setStyleSheet(
+            "#dangerButton { background-color: #c42b1c; border-color: #c42b1c; padding: 5px 16px; }"
+            "#dangerButton:hover { background-color: #e81123; border-color: #e81123; }"
+            "#dangerButton:pressed { background-color: #a4262c; border-color: #a4262c; }"
+            "#dangerButton:disabled { background-color: #4d4d4d; border-color: #4d4d4d; }"
+        )
+        self.clean_btn.clicked.connect(self._remove_expired)
+
         title_row.addWidget(self.title_label)
         title_row.addStretch(1)
         title_row.addWidget(self.recording_dot)
         title_row.addWidget(self.recording_label)
         title_row.addSpacing(16)
         title_row.addWidget(self.record_button)
+        title_row.addSpacing(8)
+        title_row.addWidget(self.clean_btn)
 
         # 副标题
         self.subtitle_label = CaptionLabel(
@@ -222,9 +238,19 @@ class DataRecorderInterface(ThemeMixin, ScrollArea):
         signal_bus.account_connected.connect(self._on_account_connected)
         signal_bus.account_disconnected.connect(self._on_account_disconnected)
 
+        # 合约查询完毕后启用"清理失效"按钮
+        self.signal_contract_ready.connect(
+            lambda: self.clean_btn.setEnabled(True)
+        )
+        from guanlan.core.trader.gateway import EVENT_CONTRACT_INITED
+        app = AppEngine.instance()
+        app.event_engine.register(
+            EVENT_CONTRACT_INITED, self._on_contract_inited
+        )
+
     def _process_log(self, msg: str) -> None:
         """处理日志消息"""
-        timestamp = datetime.now().strftime("%H:%M:%S")
+        timestamp = beijing_now().strftime("%H:%M:%S")
         self.log_edit.append(f"{timestamp}\t{msg}")
 
     def _process_update(self, bar_symbols: list, tick_symbols: list) -> None:
@@ -330,6 +356,14 @@ class DataRecorderInterface(ThemeMixin, ScrollArea):
         vt_symbol = self.symbol_line.text().strip()
         if vt_symbol:
             self.engine.remove_tick_recording(vt_symbol)
+
+    def _remove_expired(self) -> None:
+        """清理引擎中不存在的失效合约"""
+        self.engine.remove_expired()
+
+    def _on_contract_inited(self, event) -> None:
+        """合约查询完毕回调（事件线程 → 信号桥接到主线程）"""
+        self.signal_contract_ready.emit()
 
     def _set_interval(self, interval: int) -> None:
         self.engine.timer_interval = interval

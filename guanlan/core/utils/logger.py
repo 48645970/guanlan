@@ -14,11 +14,15 @@ Author: 海山观澜
 """
 
 import sys
+from datetime import timedelta, timezone
 from typing import Any
 
 from loguru import logger as _logger
 
 from guanlan.core.utils.common import get_folder_path
+
+# 北京时间 UTC+8
+_BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 # 日志级别常量（兼容标准 logging）
@@ -57,8 +61,12 @@ def _setup(level: int = INFO) -> None:
     # 移除 loguru 默认的 stderr handler
     _logger.remove()
 
+    # 强制北京时间：通过 patcher 将 record["time"] 转为 UTC+8
+    def _beijing_patcher(record):
+        record["time"] = record["time"].astimezone(_BEIJING_TZ)
+
     # 设置默认 extra，防止第三方库（如 VNPY）未 bind name 时 KeyError
-    _logger.configure(extra={"name": "unknown"})
+    _logger.configure(extra={"name": "unknown"}, patcher=_beijing_patcher)
 
     # 控制台彩色格式
     console_format = (

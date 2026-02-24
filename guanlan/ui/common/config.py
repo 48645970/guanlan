@@ -13,7 +13,6 @@ from pathlib import Path
 
 from PySide6.QtCore import QLocale
 from PySide6.QtGui import QColor
-from tzlocal import get_localzone_name
 from qfluentwidgets import (
     qconfig, QConfig, ConfigItem, OptionsConfigItem, BoolValidator,
     OptionsValidator, RangeConfigItem, RangeValidator, Theme,
@@ -123,7 +122,7 @@ class GuanlanConfig(QConfig):
     logFile = ConfigItem("Log", "File", True, BoolValidator())
 
     # ==================== 数据库配置 ====================
-    databaseTimezone = ConfigItem("Database", "Timezone", get_localzone_name())
+    databaseTimezone = ConfigItem("Database", "Timezone", "Asia/Shanghai")
     databaseDriver = OptionsConfigItem(
         "Database", "Driver", "arctic",
         OptionsValidator(["arctic", "sqlite", "mysql", "postgresql", "mongodb"]),

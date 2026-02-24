@@ -12,6 +12,8 @@ Author: 海山观澜
 
 from datetime import datetime, timedelta
 
+from guanlan.core.utils.trading_period import beijing_now
+
 from vnpy.trader.constant import Exchange, Interval
 from vnpy.trader.object import BarData
 
@@ -80,7 +82,7 @@ class ChartDataLoader:
             minutes_needed = period.history_minutes(
                 count if count > 0 else 1440
             )
-            end = datetime.now()
+            end = beijing_now()
             start = end - timedelta(minutes=minutes_needed)
             temp_bars = self._load_from_tick(
                 symbol, exchange, start, end, period,
@@ -98,7 +100,7 @@ class ChartDataLoader:
             # bar 数据不存在时，尝试从 tick 合成
             if not temp_bars and count > 0:
                 minutes_needed = period.history_minutes(count)
-                end = datetime.now()
+                end = beijing_now()
                 start = end - timedelta(minutes=minutes_needed)
                 temp_bars = self._load_from_tick(
                     symbol, exchange, start, end, period,

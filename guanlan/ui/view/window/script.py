@@ -8,7 +8,7 @@
 Author: 海山观澜
 """
 
-from datetime import datetime
+from guanlan.core.utils.trading_period import beijing_now
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIcon
@@ -329,11 +329,7 @@ class ScriptTraderWindow(CursorFixMixin, FluentWidget):
     def _process_log_event(self, event: Event) -> None:
         """脚本日志事件"""
         log: LogData = event.data
-        dt = log.datetime if hasattr(log, "datetime") and log.datetime else None
-        time_str = (
-            f"{dt:%H:%M:%S}" if dt
-            else datetime.now().strftime("%H:%M:%S")
-        )
+        time_str = beijing_now().strftime("%H:%M:%S")
 
         # 解析 [脚本名] 前缀
         msg = log.msg

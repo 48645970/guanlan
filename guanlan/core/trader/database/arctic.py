@@ -14,10 +14,10 @@ import arcticdb as adb
 import pandas as pd
 
 from vnpy.trader.constant import Interval, Exchange
-from vnpy.trader.database import BaseDatabase, BarOverview, TickOverview, convert_tz
+from vnpy.trader.database import BaseDatabase, BarOverview, TickOverview
 from vnpy.trader.object import BarData, TickData
 
-from guanlan.core.constants import ARCTIC_DATA_DIR
+from guanlan.core.constants import ARCTIC_DATA_DIR, CHINA_TZ
 
 
 # Tick 数值字段（不含 symbol/exchange/datetime）
@@ -62,6 +62,16 @@ def _parse_tick_key(key: str) -> tuple[str, Exchange] | None:
         return parts[0], Exchange(parts[1])
     except ValueError:
         return None
+
+
+def _to_china_tz(dt: datetime) -> datetime:
+    """将 datetime 转为北京时间并去掉时区信息
+
+    替代 vnpy 的 convert_tz（使用 DB_TZ 可能不是北京时区）。
+    """
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(CHINA_TZ)
+    return dt.replace(tzinfo=None)
 
 
 def _to_utc_timestamp(dt: datetime) -> pd.Timestamp:
@@ -139,7 +149,7 @@ class ArcticDBDatabase(BaseDatabase):
 
         for key, group_bars in groups.items():
             data = [{
-                "datetime": convert_tz(bar.datetime),
+                "datetime": _to_china_tz(bar.datetime),
                 "open_price": bar.open_price,
                 "high_price": bar.high_price,
                 "low_price": bar.low_price,
@@ -152,6 +162,9 @@ class ArcticDBDatabase(BaseDatabase):
             df = pd.DataFrame(data)
             df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
             df.set_index("datetime", inplace=True)
+            # 统一数值列为 float64，避免 ArcticDB append 时类型不匹配
+            for col in df.columns:
+                df[col] = df[col].astype("float64")
             df.sort_index(inplace=True)
             self._upsert(self.bar_lib, key, df, stream)
 
@@ -250,7 +263,7 @@ class ArcticDBDatabase(BaseDatabase):
         for key, group_ticks in groups.items():
             data = []
             for tick in group_ticks:
-                d = {"datetime": convert_tz(tick.datetime)}
+                d = {"datetime": _to_china_tz(tick.datetime)}
                 for field in TICK_FIELDS:
                     d[field] = getattr(tick, field, 0.0)
                 data.append(d)
@@ -258,6 +271,9 @@ class ArcticDBDatabase(BaseDatabase):
             df = pd.DataFrame(data)
             df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
             df.set_index("datetime", inplace=True)
+            # 统一数值列为 float64，避免 ArcticDB append 时类型不匹配
+            for col in df.columns:
+                df[col] = df[col].astype("float64")
             df.sort_index(inplace=True)
             self._upsert(self.tick_lib, key, df, stream)
 

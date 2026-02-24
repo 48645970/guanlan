@@ -14,6 +14,8 @@ from copy import copy
 from datetime import datetime, timedelta
 
 import numpy as np
+
+from guanlan.core.utils.trading_period import beijing_now
 import pyqtgraph as pg
 
 from PySide6.QtCore import Qt, Signal, QDate
@@ -1180,7 +1182,7 @@ class BacktestWindow(CursorFixMixin, FluentWidget):
 
     def _process_log_event(self, event: Event) -> None:
         msg = event.data
-        timestamp = datetime.now().strftime("%H:%M:%S")
+        timestamp = beijing_now().strftime("%H:%M:%S")
         self._log_edit.append(f"{timestamp}\t{msg}")
 
     def _process_finished_event(self, event: Event) -> None:
@@ -1204,7 +1206,7 @@ class BacktestWindow(CursorFixMixin, FluentWidget):
         self._result_btn.setEnabled(True)
 
     def _write_log(self, msg: str) -> None:
-        timestamp = datetime.now().strftime("%H:%M:%S")
+        timestamp = beijing_now().strftime("%H:%M:%S")
         self._log_edit.append(f"{timestamp}\t{msg}")
 
     # ── 回测 ──

@@ -10,7 +10,7 @@ Author: 海山观澜
 """
 
 from copy import copy
-from datetime import datetime
+from guanlan.core.utils.trading_period import beijing_now
 
 from pydantic import BaseModel
 
@@ -637,8 +637,7 @@ class PortfolioStrategyWindow(CursorFixMixin, FluentWidget):
     def _process_log_event(self, event: Event) -> None:
         """组合策略日志事件"""
         log: LogData = event.data
-        dt = log.datetime if hasattr(log, "datetime") and log.datetime else None
-        time_str = f"{dt:%H:%M:%S}" if dt else datetime.now().strftime("%H:%M:%S")
+        time_str = beijing_now().strftime("%H:%M:%S")
 
         # 解析 [策略名] 前缀
         msg = log.msg

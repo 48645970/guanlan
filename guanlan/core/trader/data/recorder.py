@@ -17,7 +17,7 @@ from queue import Queue, Empty
 from threading import Thread
 
 from vnpy.trader.constant import Exchange
-from vnpy.trader.database import DB_TZ
+from guanlan.core.constants import CHINA_TZ
 from vnpy.trader.event import EVENT_TICK, EVENT_CONTRACT, EVENT_TIMER
 from vnpy.trader.object import (
     TickData, BarData, ContractData, SubscribeRequest
@@ -27,6 +27,7 @@ from vnpy.trader.utility import BarGenerator
 from guanlan.core.trader.event import Event, EventEngine
 from guanlan.core.trader.engine import MainEngine
 from guanlan.core.app import AppEngine
+from guanlan.core.trader.gateway import EVENT_CONTRACT_INITED
 from guanlan.core.trader.database import get_database
 from guanlan.core.utils.common import load_json_file, save_json_file
 from guanlan.core.utils.symbol_converter import SymbolConverter
@@ -78,7 +79,7 @@ class DataRecorderEngine:
         self.bars: dict[str, list[BarData]] = defaultdict(list)
 
         # Tick 时间过滤
-        self.filter_dt: datetime = datetime.now(DB_TZ)
+        self.filter_dt: datetime = datetime.now(CHINA_TZ)
         self.filter_window: int = 60
         self.filter_delta: timedelta = timedelta(seconds=self.filter_window)
 
@@ -230,6 +231,38 @@ class DataRecorderEngine:
         self.save_setting()
         self.put_event()
 
+    def remove_expired(self) -> list[str]:
+        """移除引擎中不存在的失效合约
+
+        Returns
+        -------
+        list[str]
+            被移除的 vt_symbol 列表
+        """
+        removed: list[str] = []
+
+        for vt_symbol in list(self.bar_recordings.keys()):
+            if not self._get_engine_contract(vt_symbol):
+                self.bar_recordings.pop(vt_symbol)
+                removed.append(vt_symbol)
+
+        for vt_symbol in list(self.tick_recordings.keys()):
+            if not self._get_engine_contract(vt_symbol):
+                if vt_symbol not in removed:
+                    removed.append(vt_symbol)
+                self.tick_recordings.pop(vt_symbol)
+
+        if removed:
+            self.save_setting()
+            self.put_event()
+            self._write_log(
+                f"已清理 {len(removed)} 个失效合约：{'、'.join(sorted(removed))}"
+            )
+        else:
+            self._write_log("没有失效合约需要清理")
+
+        return removed
+
     # ── 录制控制 ─────────────────────────────────────────
 
     @property
@@ -238,7 +271,10 @@ class DataRecorderEngine:
         return self.active
 
     def start_recording(self) -> None:
-        """开始录制：注册事件 + 订阅已有合约 + 启动写入线程"""
+        """开始录制：注册事件 + 启动写入线程
+
+        批量订阅延迟到合约查询完毕后执行，避免合约未到齐时大量"不存在"。
+        """
         if self.active:
             return
 
@@ -246,7 +282,18 @@ class DataRecorderEngine:
         self.thread = Thread(target=self._run, daemon=True)
         self.thread.start()
         self._register_events()
-        self._subscribe_all()
+
+        app = AppEngine.instance()
+        if app._contract_ready:
+            # 合约已到齐，立即订阅
+            self._subscribe_all()
+        else:
+            # 等合约到齐后再订阅
+            self._write_log("等待合约查询完毕后批量订阅...")
+            self.event_engine.register(
+                EVENT_CONTRACT_INITED, self._on_contract_inited
+            )
+
         self._write_log("开始记录")
 
     def _subscribe_all(self) -> None:
@@ -307,6 +354,9 @@ class DataRecorderEngine:
 
     def _run(self) -> None:
         """写入线程主循环"""
+        consecutive_errors: int = 0
+        max_consecutive_errors: int = 5
+
         while self.active:
             try:
                 task_type, data = self.queue.get(timeout=1)
@@ -316,12 +366,24 @@ class DataRecorderEngine:
                 elif task_type == "bar":
                     self.database.save_bar_data(data, stream=True)
 
+                consecutive_errors = 0
+
             except Empty:
                 continue
             except Exception:
-                self.active = False
+                consecutive_errors += 1
                 info = traceback.format_exc()
-                self._write_log(f"录制异常，已停止：\n{info}")
+
+                if consecutive_errors >= max_consecutive_errors:
+                    self.active = False
+                    self._write_log(
+                        f"连续写入失败 {consecutive_errors} 次，录制已停止：\n{info}"
+                    )
+                else:
+                    self._write_log(
+                        f"写入异常（第 {consecutive_errors} 次，"
+                        f"连续 {max_consecutive_errors} 次后停止）：\n{info}"
+                    )
 
     # ── 事件处理 ─────────────────────────────────────────
 
@@ -336,10 +398,14 @@ class DataRecorderEngine:
         self.event_engine.unregister(EVENT_TIMER, self._on_timer)
         self.event_engine.unregister(EVENT_TICK, self._on_tick)
         self.event_engine.unregister(EVENT_CONTRACT, self._on_contract)
+        # 可能尚未触发就停止了录制
+        self.event_engine.unregister(
+            EVENT_CONTRACT_INITED, self._on_contract_inited
+        )
 
     def _on_timer(self, event: Event) -> None:
         """定时器事件：更新过滤时间，批量刷写"""
-        self.filter_dt = datetime.now(DB_TZ)
+        self.filter_dt = datetime.now(CHINA_TZ)
 
         self.timer_count += 1
         if self.timer_count < self.timer_interval:
@@ -378,6 +444,14 @@ class DataRecorderEngine:
         """Tick 事件：过滤并录制"""
         tick: TickData = event.data
         self._update_tick(tick)
+
+    def _on_contract_inited(self, event: Event) -> None:
+        """合约查询完毕：批量订阅并注销自身（一次性回调）"""
+        self.event_engine.unregister(
+            EVENT_CONTRACT_INITED, self._on_contract_inited
+        )
+        self._write_log("合约查询完毕，开始批量订阅")
+        self._subscribe_all()
 
     def _on_contract(self, event: Event) -> None:
         """合约事件：自动订阅已录制合约
